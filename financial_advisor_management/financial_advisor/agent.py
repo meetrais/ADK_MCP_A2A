@@ -7,7 +7,7 @@ from .sub_agents.execution_analyst import execution_analyst_agent
 from .sub_agents.risk_analyst import risk_analyst_agent
 from .sub_agents.trading_analyst import trading_analyst_agent
 
-MODEL = "gemini-2.5-pro"
+MODEL = "gemini-pro"
 
 financial_coordinator = LlmAgent(
     name="financial_coordinator",

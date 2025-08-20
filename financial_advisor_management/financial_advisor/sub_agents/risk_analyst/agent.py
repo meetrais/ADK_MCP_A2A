@@ -1,7 +1,7 @@
 from google.adk import Agent
 from . import prompt
 
-MODEL="gemini-2.5-pro"
+MODEL="gemini-pro"
 
 risk_analyst_agent = Agent(
     model=MODEL,
