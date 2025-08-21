@@ -1,4 +1,4 @@
-from google.adk import Agent
+from adk import Agent
 from . import prompt
 
 MODEL="gemini-pro"

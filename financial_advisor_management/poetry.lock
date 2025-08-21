@@ -891,13 +891,14 @@ tqdm = ["tqdm"]
 
 [[package]]
 name = "google-adk"
-version = "1.11.0"
+version = "1.12.0"
 description = "Agent Development Kit"
 optional = false
 python-versions = ">=3.9"
 groups = ["main", "dev"]
 files = [
-    {file = "google_adk-1.11.0-py3-none-any.whl", hash = "sha256:9c0a75b9994ae7630a3957c076003ac52b1a8a99dd9b0aacf06d019e18093d06"},
+    {file = "google_adk-1.12.0-py3-none-any.whl", hash = "sha256:3b0efedc2dc053532d73bf328d87ac1b8e0467cbfe8d5468e9df52c4de587e88"},
+    {file = "google_adk-1.12.0.tar.gz", hash = "sha256:4ff8e70f63a65ad9e147ec180e5ffe16970721936ec34eda40ae9e1621f70605"},
 ]
 
 [package.dependencies]
@@ -911,6 +912,7 @@ google-cloud-aiplatform = [
     {version = ">=1.95.1,<2.0.0", extras = ["agent-engines"]},
     {version = ">=1.100.0", extras = ["evaluation"], optional = true, markers = "extra == \"eval\""},
 ]
+google-cloud-bigtable = ">=2.32.0"
 google-cloud-secret-manager = ">=2.22.0,<3.0.0"
 google-cloud-spanner = ">=3.56.0,<4.0.0"
 google-cloud-speech = ">=2.30.0,<3.0.0"
@@ -943,8 +945,8 @@ a2a = ["a2a-sdk (>=0.3.0,<0.4.0) ; python_version >= \"3.10\""]
 dev = ["flit (>=3.10.0)", "isort (>=6.0.0)", "mypy (>=1.15.0)", "pyink (>=24.10.0)", "pylint (>=2.6.0)"]
 docs = ["autodoc_pydantic", "furo", "myst-parser", "sphinx", "sphinx-autodoc-typehints", "sphinx-rtd-theme"]
 eval = ["google-cloud-aiplatform[evaluation] (>=1.100.0)", "pandas (>=2.2.3)", "rouge-score (>=0.1.2)", "tabulate (>=0.9.0)"]
-extensions = ["anthropic (>=0.43.0)", "beautifulsoup4 (>=3.2.2)", "crewai[tools] ; python_version >= \"3.10\"", "docker (>=7.0.0)", "langgraph (>=0.2.60)", "litellm (>=1.63.11)", "llama-index-readers-file (>=0.4.0)", "lxml (>=5.3.0)", "toolbox-core (>=0.1.0)"]
-test = ["anthropic (>=0.43.0)", "langchain-community (>=0.3.17)", "langgraph (>=0.2.60,<=0.4.10)", "litellm (>=1.71.2)", "llama-index-readers-file (>=0.4.0)", "pytest (>=8.3.4)", "pytest-asyncio (>=0.25.0)", "pytest-mock (>=3.14.0)", "pytest-xdist (>=3.6.1)", "python-multipart (>=0.0.9)"]
+extensions = ["anthropic (>=0.43.0)", "beautifulsoup4 (>=3.2.2)", "crewai[tools] ; python_version >= \"3.10\"", "docker (>=7.0.0)", "langgraph (>=0.2.60)", "litellm (>=1.75.5)", "llama-index-readers-file (>=0.4.0)", "lxml (>=5.3.0)", "toolbox-core (>=0.1.0)"]
+test = ["anthropic (>=0.43.0)", "langchain-community (>=0.3.17)", "langgraph (>=0.2.60,<=0.4.10)", "litellm (>=1.75.5,<2.0.0)", "llama-index-readers-file (>=0.4.0)", "openai (>=1.100.2)", "pytest (>=8.3.4)", "pytest-asyncio (>=0.25.0)", "pytest-mock (>=3.14.0)", "pytest-xdist (>=3.6.1)", "python-multipart (>=0.0.9)"]
 
 [[package]]
 name = "google-api-core"
@@ -962,16 +964,16 @@ files = [
 google-auth = ">=2.14.1,<3.0.0"
 googleapis-common-protos = ">=1.56.2,<2.0.0"
 grpcio = [
-    {version = ">=1.33.2,<2.0.0", optional = true, markers = "extra == \"grpc\""},
     {version = ">=1.49.1,<2.0.0", optional = true, markers = "python_version >= \"3.11\" and extra == \"grpc\""},
+    {version = ">=1.33.2,<2.0.0", optional = true, markers = "extra == \"grpc\""},
 ]
 grpcio-status = [
-    {version = ">=1.33.2,<2.0.0", optional = true, markers = "extra == \"grpc\""},
     {version = ">=1.49.1,<2.0.0", optional = true, markers = "python_version >= \"3.11\" and extra == \"grpc\""},
+    {version = ">=1.33.2,<2.0.0", optional = true, markers = "extra == \"grpc\""},
 ]
 proto-plus = [
-    {version = ">=1.22.3,<2.0.0"},
     {version = ">=1.25.0,<2.0.0", markers = "python_version >= \"3.13\""},
+    {version = ">=1.22.3,<2.0.0"},
 ]
 protobuf = ">=3.19.5,<3.20.0 || >3.20.0,<3.20.1 || >3.20.1,<4.21.0 || >4.21.0,<4.21.1 || >4.21.1,<4.21.2 || >4.21.2,<4.21.3 || >4.21.3,<4.21.4 || >4.21.4,<4.21.5 || >4.21.5,<7.0.0"
 requests = ">=2.18.0,<3.0.0"
@@ -1086,8 +1088,8 @@ pydantic = [
 pyyaml = {version = "*", optional = true, markers = "extra == \"evaluation\""}
 "ruamel.yaml" = {version = "*", optional = true, markers = "extra == \"evaluation\""}
 scikit-learn = [
-    {version = "<1.6.0", optional = true, markers = "python_version <= \"3.10\" and extra == \"evaluation\""},
     {version = "*", optional = true, markers = "python_version > \"3.10\" and extra == \"evaluation\""},
+    {version = "<1.6.0", optional = true, markers = "python_version <= \"3.10\" and extra == \"evaluation\""},
 ]
 shapely = "<3.0.0"
 tqdm = {version = ">=4.23.0", optional = true, markers = "extra == \"evaluation\""}
@@ -1138,8 +1140,8 @@ files = [
 google-api-core = {version = ">=1.34.1,<2.0.dev0 || >=2.11.dev0,<3.0.0", extras = ["grpc"]}
 google-auth = ">=2.14.1,<2.24.0 || >2.24.0,<2.25.0 || >2.25.0,<3.0.0"
 proto-plus = [
-    {version = ">=1.22.3,<2.0.0"},
     {version = ">=1.25.0,<2.0.0", markers = "python_version >= \"3.13\""},
+    {version = ">=1.22.3,<2.0.0"},
 ]
 protobuf = ">=3.20.2,<4.21.0 || >4.21.0,<4.21.1 || >4.21.1,<4.21.2 || >4.21.2,<4.21.3 || >4.21.3,<4.21.4 || >4.21.4,<4.21.5 || >4.21.5,<7.0.0"
 
@@ -1161,14 +1163,14 @@ protobuf = ">=3.20.2,<4.21.1 || >4.21.1,<4.21.2 || >4.21.2,<4.21.3 || >4.21.3,<4
 
 [[package]]
 name = "google-cloud-bigquery"
-version = "3.35.1"
+version = "3.36.0"
 description = "Google BigQuery API client library"
 optional = false
 python-versions = ">=3.9"
 groups = ["main", "dev"]
 files = [
-    {file = "google_cloud_bigquery-3.35.1-py3-none-any.whl", hash = "sha256:6739a6ba63c6d80735ca2b34b1df2090ff473b80c1a62354caa2debe6dbbd961"},
-    {file = "google_cloud_bigquery-3.35.1.tar.gz", hash = "sha256:599f26cacf190acfe88000f6cc5f4bc9e6baac7899e4f406ca054f1906f71960"},
+    {file = "google_cloud_bigquery-3.36.0-py3-none-any.whl", hash = "sha256:0cfbad09999907600fd0618794491db10000d98911ec7768ac6041cb9a0257dd"},
+    {file = "google_cloud_bigquery-3.36.0.tar.gz", hash = "sha256:519d7a16be2119dca1ea8871e6dd45f971a8382c337cbe045319543b9e743bdd"},
 ]
 
 [package.dependencies]
@@ -1191,6 +1193,33 @@ matplotlib = ["matplotlib (>=3.10.3) ; python_version >= \"3.10\"", "matplotlib 
 opentelemetry = ["opentelemetry-api (>=1.1.0)", "opentelemetry-instrumentation (>=0.20b0)", "opentelemetry-sdk (>=1.1.0)"]
 pandas = ["db-dtypes (>=1.0.4,<2.0.0)", "grpcio (>=1.47.0,<2.0.0)", "grpcio (>=1.49.1,<2.0.0) ; python_version >= \"3.11\"", "pandas (>=1.3.0)", "pandas-gbq (>=0.26.1)", "pyarrow (>=3.0.0)"]
 tqdm = ["tqdm (>=4.23.4,<5.0.0)"]
+
+[[package]]
+name = "google-cloud-bigtable"
+version = "2.32.0"
+description = "Google Cloud Bigtable API client library"
+optional = false
+python-versions = ">=3.7"
+groups = ["main", "dev"]
+files = [
+    {file = "google_cloud_bigtable-2.32.0-py3-none-any.whl", hash = "sha256:39881c36a4009703fa046337cf3259da4dd2cbcabe7b95ee5b0b0a8f19c3234e"},
+    {file = "google_cloud_bigtable-2.32.0.tar.gz", hash = "sha256:1dcf8a9fae5801164dc184558cd8e9e930485424655faae254e2c7350fa66946"},
+]
+
+[package.dependencies]
+google-api-core = {version = ">=2.17.0,<3.0.0", extras = ["grpc"]}
+google-auth = ">=2.14.1,<2.24.0 || >2.24.0,<2.25.0 || >2.25.0,<3.0.0"
+google-cloud-core = ">=1.4.4,<3.0.0"
+google-crc32c = ">=1.5.0,<2.0.0dev"
+grpc-google-iam-v1 = ">=0.12.4,<1.0.0"
+proto-plus = [
+    {version = ">=1.25.0,<2.0.0", markers = "python_version >= \"3.13\""},
+    {version = ">=1.22.3,<2.0.0", markers = "python_version < \"3.13\""},
+]
+protobuf = ">=3.20.2,<4.21.0 || >4.21.0,<4.21.1 || >4.21.1,<4.21.2 || >4.21.2,<4.21.3 || >4.21.3,<4.21.4 || >4.21.4,<4.21.5 || >4.21.5,<7.0.0"
+
+[package.extras]
+libcst = ["libcst (>=0.2.5)"]
 
 [[package]]
 name = "google-cloud-core"
@@ -1232,9 +1261,9 @@ google-cloud-core = ">=2.0.0,<3.0.0"
 grpc-google-iam-v1 = ">=0.12.4,<1.0.0"
 opentelemetry-api = ">=1.9.0"
 proto-plus = [
-    {version = ">=1.22.0,<2.0.0"},
     {version = ">=1.25.0,<2.0.0", markers = "python_version >= \"3.13\""},
-    {version = ">=1.22.2,<2.0.0", markers = "python_version >= \"3.11\" and python_version < \"3.13\""},
+    {version = ">=1.22.0,<2.0.0"},
+    {version = ">=1.22.2,<2.0.0", markers = "python_version >= \"3.11\""},
 ]
 protobuf = ">=3.20.2,<4.21.0 || >4.21.0,<4.21.1 || >4.21.1,<4.21.2 || >4.21.2,<4.21.3 || >4.21.3,<4.21.4 || >4.21.4,<4.21.5 || >4.21.5,<7.0.0"
 
@@ -1255,8 +1284,8 @@ google-api-core = {version = ">=1.34.1,<2.0.dev0 || >=2.11.dev0,<3.0.0", extras 
 google-auth = ">=2.14.1,<2.24.0 || >2.24.0,<2.25.0 || >2.25.0,<3.0.0"
 grpc-google-iam-v1 = ">=0.14.0,<1.0.0"
 proto-plus = [
-    {version = ">=1.22.3,<2.0.0"},
     {version = ">=1.25.0,<2.0.0", markers = "python_version >= \"3.13\""},
+    {version = ">=1.22.3,<2.0.0"},
 ]
 protobuf = ">=3.20.2,<4.21.0 || >4.21.0,<4.21.1 || >4.21.1,<4.21.2 || >4.21.2,<4.21.3 || >4.21.3,<4.21.4 || >4.21.4,<4.21.5 || >4.21.5,<7.0.0"
 
@@ -1277,8 +1306,8 @@ google-api-core = {version = ">=1.34.1,<2.0.dev0 || >=2.11.dev0,<3.0.0", extras 
 google-auth = ">=2.14.1,<2.24.0 || >2.24.0,<2.25.0 || >2.25.0,<3.0.0"
 grpc-google-iam-v1 = ">=0.14.0,<1.0.0"
 proto-plus = [
-    {version = ">=1.22.3,<2.0.0"},
     {version = ">=1.25.0,<2.0.0", markers = "python_version >= \"3.13\""},
+    {version = ">=1.22.3,<2.0.0"},
 ]
 protobuf = ">=3.20.2,<4.21.0 || >4.21.0,<4.21.1 || >4.21.1,<4.21.2 || >4.21.2,<4.21.3 || >4.21.3,<4.21.4 || >4.21.4,<4.21.5 || >4.21.5,<7.0.0"
 
@@ -1300,8 +1329,8 @@ google-cloud-core = ">=1.4.4,<3.0.0"
 grpc-google-iam-v1 = ">=0.12.4,<1.0.0"
 grpc-interceptor = ">=0.15.4"
 proto-plus = [
-    {version = ">=1.22.0,<2.0.0"},
     {version = ">=1.22.2,<2.0.0", markers = "python_version >= \"3.11\""},
+    {version = ">=1.22.0,<2.0.0"},
 ]
 protobuf = ">=3.20.2,<4.21.0 || >4.21.0,<4.21.1 || >4.21.1,<4.21.2 || >4.21.2,<4.21.3 || >4.21.3,<4.21.4 || >4.21.4,<4.21.5 || >4.21.5,<7.0.0"
 sqlparse = ">=0.4.4"
@@ -1326,8 +1355,8 @@ files = [
 google-api-core = {version = ">=1.34.1,<2.0.dev0 || >=2.11.dev0,<3.0.0", extras = ["grpc"]}
 google-auth = ">=2.14.1,<2.24.0 || >2.24.0,<2.25.0 || >2.25.0,<3.0.0"
 proto-plus = [
-    {version = ">=1.22.3,<2.0.0"},
     {version = ">=1.25.0,<2.0.0", markers = "python_version >= \"3.13\""},
+    {version = ">=1.22.3,<2.0.0"},
 ]
 protobuf = ">=3.20.2,<4.21.0 || >4.21.0,<4.21.1 || >4.21.1,<4.21.2 || >4.21.2,<4.21.3 || >4.21.3,<4.21.4 || >4.21.4,<4.21.5 || >4.21.5,<7.0.0"
 
@@ -1371,8 +1400,8 @@ files = [
 google-api-core = {version = ">=1.34.1,<2.0.dev0 || >=2.11.dev0,<3.0.0", extras = ["grpc"]}
 google-auth = ">=2.14.1,<2.24.0 || >2.24.0,<2.25.0 || >2.25.0,<3.0.0"
 proto-plus = [
-    {version = ">=1.22.3,<2.0.0"},
     {version = ">=1.25.0,<2.0.0", markers = "python_version >= \"3.13\""},
+    {version = ">=1.22.3,<2.0.0"},
 ]
 protobuf = ">=3.20.2,<4.21.0 || >4.21.0,<4.21.1 || >4.21.1,<4.21.2 || >4.21.2,<4.21.3 || >4.21.3,<4.21.4 || >4.21.4,<4.21.5 || >4.21.5,<7.0.0"
 
@@ -2659,8 +2688,8 @@ files = [
 
 [package.dependencies]
 numpy = [
-    {version = ">=1.22.4", markers = "python_version < \"3.11\""},
     {version = ">=1.26.0", markers = "python_version >= \"3.12\""},
+    {version = ">=1.22.4", markers = "python_version < \"3.11\""},
     {version = ">=1.23.2", markers = "python_version == \"3.11\""},
 ]
 python-dateutil = ">=2.8.2"
@@ -4794,4 +4823,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.9"
-content-hash = "24948c8bf081465277a1957c35cc64373bb9417e0177789a0fe9059522fb9af0"
+content-hash = "80b454c5e26a2c6c3a8cbb5aa3b30b30f6f5be0451a278ca39fd3d4095ef07ca"

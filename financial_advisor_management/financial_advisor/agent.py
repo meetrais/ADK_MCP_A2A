@@ -1,5 +1,5 @@
-from google.adk.agents import LlmAgent
-from google.adk.tools.agent_tool import AgentTool
+from adk.agent import LlmAgent
+from adk.tools import AgentTool
 
 from . import prompt
 from .sub_agents.data_analyst import data_analyst_agent
