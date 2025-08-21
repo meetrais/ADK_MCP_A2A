@@ -2,7 +2,7 @@ from google.adk import Agent
 from google.adk.tools import google_search
 from . import prompt
 
-MODEL = "gemini-pro"
+MODEL = "gemini-2.5-flash"
 
 data_analyst_agent = Agent(
     model=MODEL,
