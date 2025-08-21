@@ -1,5 +1,5 @@
-from adk import Agent
-from adk.tools import google_search
+from google.adk import Agent
+from google.adk.tools import google_search
 from . import prompt
 
 MODEL = "gemini-pro"
