@@ -93,9 +93,13 @@ A2A_AGENTS = {
         "url": "http://localhost:8080",
         "description": "Call data analyst agent via A2A protocol for market data analysis"
     },
+    "execution_analyst": {
+        "url": "http://localhost:8081", 
+        "description": "Call execution analyst agent via A2A protocol for execution planning"
+    },
     # Future agents can be added here:
     # "risk_analyst": {
-    #     "url": "http://localhost:8081", 
+    #     "url": "http://localhost:8082", 
     #     "description": "Call risk analyst agent via A2A protocol for risk assessment"
     # },
 }
@@ -111,6 +115,7 @@ for agent_name, config in A2A_AGENTS.items():
 
 # Get specific agents
 data_analyst_a2a_agent = a2a_agents["data_analyst"]
+execution_analyst_a2a_agent = a2a_agents["execution_analyst"]
 
 financial_coordinator = LlmAgent(
     name="financial_coordinator",
@@ -124,10 +129,10 @@ financial_coordinator = LlmAgent(
     instruction=prompt.FINANCIAL_COORDINATOR_PROMPT,
     output_key="financial_coordinator_output",
     tools=[
-        AgentTool(agent=data_analyst_a2a_agent),  # A2A call via proxy
-        AgentTool(agent=trading_analyst_agent),   # Direct call
-        AgentTool(agent=execution_analyst_agent), # Direct call
-        AgentTool(agent=risk_analyst_agent),      # Direct call
+        AgentTool(agent=data_analyst_a2a_agent),     # A2A call via proxy
+        AgentTool(agent=trading_analyst_agent),      # Direct call
+        AgentTool(agent=execution_analyst_a2a_agent), # A2A call via proxy
+        AgentTool(agent=risk_analyst_agent),         # Direct call
     ],
 )
 
