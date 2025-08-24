@@ -52,6 +52,35 @@ def get_dummy_execution_analysis(strategy_data):
         ])
     }
 
+def get_dummy_trading_analysis(market_data):
+    """Generate dummy trading analysis for market data"""
+    strategies = random.choice([
+        ['Buy and Hold', 'Dollar Cost Averaging'],
+        ['Momentum Trading', 'Mean Reversion'],
+        ['Swing Trading', 'Day Trading'],
+        ['Options Strategy', 'Pairs Trading']
+    ])
+    
+    return {
+        'trading_strategies': strategies,
+        'entry_points': f'Recommended entry: {"Above resistance at current level" if random.random() > 0.5 else "On pullback to support"}. '
+                       f'Technical signal: {"RSI oversold" if random.random() > 0.5 else "Moving average crossover"}.',
+        'exit_points': f'Exit strategy: {"Take profit at {round(random.uniform(5, 15), 1)}% gain" if random.random() > 0.5 else f"Stop loss at {round(random.uniform(3, 8), 1)}% loss"}. '
+                      f'Trailing stop recommended: {"Yes" if random.random() > 0.5 else "No"}.',
+        'risk_management': {
+            'max_position_size': f'{random.randint(2, 10)}%',
+            'stop_loss_percentage': round(random.uniform(3, 8), 1),
+            'risk_reward_ratio': f'1:{random.randint(2, 5)}'
+        },
+        'position_sizing': f'Recommended position: {"Conservative 2-3% of portfolio" if random.random() > 0.5 else "Moderate 4-6% of portfolio"}. '
+                          f'Consider {"scaling in gradually" if random.random() > 0.5 else "single entry point"}.',
+        'timeframe_analysis': {
+            'short_term': random.choice(['Bullish', 'Bearish', 'Neutral']),
+            'medium_term': random.choice(['Bullish', 'Bearish', 'Neutral']),
+            'long_term': random.choice(['Bullish', 'Bearish', 'Neutral'])
+        }
+    }
+
 @app.route('/analyze', methods=['POST'])
 def analyze():
     """MCP endpoint for financial analysis"""
@@ -108,6 +137,35 @@ def execution_analyze():
     }
     
     print(f"MCP Server: Sending execution response: {response}")  # Debug log
+    return jsonify(response)
+
+@app.route('/trading-analyze', methods=['POST'])
+def trading_analyze():
+    """MCP endpoint for trading analysis"""
+    print(f"MCP Server: Received trading analysis request")  # Debug log
+    
+    data = request.get_json()
+    print(f"MCP Server: Request data: {data}")  # Debug log
+    
+    if not data or 'market_data' not in data:
+        print("MCP Server: Error - No market data provided")  # Debug log
+        return jsonify({
+            'status': 'error',
+            'message': 'Market data is required'
+        }), 400
+    
+    market_data = data['market_data']
+    print(f"MCP Server: Analyzing market data: {market_data}")  # Debug log
+    
+    analysis = get_dummy_trading_analysis(market_data)
+    print(f"MCP Server: Generated trading analysis: {analysis}")  # Debug log
+    
+    response = {
+        'status': 'success',
+        'data': analysis
+    }
+    
+    print(f"MCP Server: Sending trading response: {response}")  # Debug log
     return jsonify(response)
 
 @app.route('/health', methods=['GET'])
