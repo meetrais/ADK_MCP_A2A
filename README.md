@@ -1,4 +1,4 @@
-# Multi-Agent Financial Advisor Management System(ADK MCP A2A)
+# Multi-Agent Financial Advisor Management System
 
 A sophisticated multi-agent financial advisory system built using Model Context Protocol(MCP), Agent to Agent protocol(A2A) and Google Agent Development Kit(ADK).
 
