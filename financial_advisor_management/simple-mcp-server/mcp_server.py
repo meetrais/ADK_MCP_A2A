@@ -81,6 +81,46 @@ def get_dummy_trading_analysis(market_data):
         }
     }
 
+def get_dummy_risk_analysis(portfolio_data):
+    """Generate dummy risk analysis for portfolio data"""
+    risk_factors = random.choice([
+        ['Market Risk', 'Credit Risk', 'Liquidity Risk'],
+        ['Concentration Risk', 'Currency Risk', 'Interest Rate Risk'],
+        ['Operational Risk', 'Regulatory Risk', 'Inflation Risk']
+    ])
+    
+    return {
+        'overall_risk_score': round(random.uniform(1, 10), 1),
+        'risk_level': random.choice(['LOW', 'MODERATE', 'HIGH', 'VERY_HIGH']),
+        'risk_factors': risk_factors,
+        'portfolio_volatility': round(random.uniform(10, 35), 2),
+        'value_at_risk': {
+            '1_day_5_percent': round(random.uniform(1000, 10000), 2),
+            '1_week_5_percent': round(random.uniform(5000, 30000), 2),
+            '1_month_5_percent': round(random.uniform(15000, 80000), 2)
+        },
+        'diversification_score': round(random.uniform(0.3, 0.9), 2),
+        'risk_recommendations': f'Portfolio shows {"moderate" if random.random() > 0.5 else "high"} concentration risk. '
+                               f'Consider {"increasing diversification" if random.random() > 0.5 else "reducing position sizes"}. '
+                               f'{"Hedge against market downturns" if random.random() > 0.5 else "Monitor correlation between assets"}.',
+        'stress_test_results': {
+            'market_crash_scenario': f'{round(random.uniform(-15, -35), 1)}%',
+            'interest_rate_spike': f'{round(random.uniform(-5, -15), 1)}%',
+            'sector_rotation': f'{round(random.uniform(-8, 8), 1)}%'
+        },
+        'hedging_suggestions': random.choice([
+            'Consider VIX calls for downside protection',
+            'Add defensive sectors (utilities, consumer staples)',
+            'Implement put spread strategies',
+            'Increase cash allocation during volatile periods'
+        ]),
+        'correlation_analysis': {
+            'intra_portfolio_correlation': round(random.uniform(0.2, 0.8), 2),
+            'market_beta': round(random.uniform(0.7, 1.3), 2),
+            'sector_concentration': f'{random.randint(15, 45)}% in top sector'
+        }
+    }
+
 @app.route('/analyze', methods=['POST'])
 def analyze():
     """MCP endpoint for financial analysis"""
@@ -166,6 +206,35 @@ def trading_analyze():
     }
     
     print(f"MCP Server: Sending trading response: {response}")  # Debug log
+    return jsonify(response)
+
+@app.route('/risk-analyze', methods=['POST'])
+def risk_analyze():
+    """MCP endpoint for risk analysis"""
+    print(f"MCP Server: Received risk analysis request")  # Debug log
+    
+    data = request.get_json()
+    print(f"MCP Server: Request data: {data}")  # Debug log
+    
+    if not data or 'portfolio_data' not in data:
+        print("MCP Server: Error - No portfolio data provided")  # Debug log
+        return jsonify({
+            'status': 'error',
+            'message': 'Portfolio data is required'
+        }), 400
+    
+    portfolio_data = data['portfolio_data']
+    print(f"MCP Server: Analyzing portfolio data: {portfolio_data}")  # Debug log
+    
+    analysis = get_dummy_risk_analysis(portfolio_data)
+    print(f"MCP Server: Generated risk analysis: {analysis}")  # Debug log
+    
+    response = {
+        'status': 'success',
+        'data': analysis
+    }
+    
+    print(f"MCP Server: Sending risk response: {response}")  # Debug log
     return jsonify(response)
 
 @app.route('/health', methods=['GET'])

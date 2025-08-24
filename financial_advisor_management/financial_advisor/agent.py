@@ -8,10 +8,6 @@ import requests
 import json
 
 from . import prompt
-# Remove data_analyst_agent direct import since we'll call it via A2A
-from .sub_agents.execution_analyst import execution_analyst_agent
-from .sub_agents.risk_analyst import risk_analyst_agent
-from .sub_agents.trading_analyst import trading_analyst_agent
 
 MODEL = "gemini-2.5-flash"
 
@@ -101,11 +97,10 @@ A2A_AGENTS = {
         "url": "http://localhost:8082", 
         "description": "Call trading analyst agent via A2A protocol for trading strategy analysis"
     },
-    # Future agents can be added here:
-    # "risk_analyst": {
-    #     "url": "http://localhost:8083", 
-    #     "description": "Call risk analyst agent via A2A protocol for risk assessment"
-    # },
+    "risk_analyst": {
+        "url": "http://localhost:8083", 
+        "description": "Call risk analyst agent via A2A protocol for risk assessment"
+    },
 }
 
 # Create A2A agent proxies from configuration
@@ -121,6 +116,7 @@ for agent_name, config in A2A_AGENTS.items():
 data_analyst_a2a_agent = a2a_agents["data_analyst"]
 execution_analyst_a2a_agent = a2a_agents["execution_analyst"]
 trading_analyst_a2a_agent = a2a_agents["trading_analyst"]
+risk_analyst_a2a_agent = a2a_agents["risk_analyst"]
 
 financial_coordinator = LlmAgent(
     name="financial_coordinator",
@@ -137,7 +133,7 @@ financial_coordinator = LlmAgent(
         AgentTool(agent=data_analyst_a2a_agent),     # A2A call via proxy
         AgentTool(agent=trading_analyst_a2a_agent),  # A2A call via proxy
         AgentTool(agent=execution_analyst_a2a_agent), # A2A call via proxy
-        AgentTool(agent=risk_analyst_agent),         # Direct call
+        AgentTool(agent=risk_analyst_a2a_agent),     # A2A call via proxy
     ],
 )
 
