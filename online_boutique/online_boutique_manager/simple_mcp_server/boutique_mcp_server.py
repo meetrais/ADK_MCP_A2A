@@ -1,3 +1,10 @@
+# C:\Code\ADK_MCP_A2A\online_boutique\online_boutique_manager\simple-mcp-server\boutique_mcp_server.py
+
+# --- MODIFICATIONS START ---
+# Import the 'os' module to read environment variables
+import os
+# --- MODIFICATIONS END ---
+
 from flask import Flask, request, jsonify
 import random
 from datetime import datetime, timedelta
@@ -484,9 +491,21 @@ def home():
         }
     })
 
-if __name__ == '__main__':
-    print("🚀 Online Boutique MCP Server starting...")
-    print("🛍️ Ready to provide e-commerce services!")
-    print("🔍 Test with: curl -X POST http://localhost:3002/products -H \"Content-Type: application/json\" -d '{\"category\":\"clothing\"}'")
+# --- MODIFICATIONS START ---
+# This function is now the main entry point for starting the server.
+def run_server(host="0.0.0.0", port=8080):
+    """Starts the MCP Flask server."""
+    # Get the port from the environment variable if it exists, otherwise use the default.
+    # This is crucial for GKE to route traffic correctly.
+    server_port = int(os.environ.get("PORT", port))
     
-    app.run(host='localhost', port=3002, debug=False)
+    print("🚀 Online Boutique MCP Server starting...")
+    print(f"🛍️ Listening on {host}:{server_port}")
+    
+    # Run the app on host '0.0.0.0' to be accessible within the container
+    # and on the port specified by the environment variable.
+    app.run(host=host, port=server_port, debug=False)
+
+if __name__ == '__main__':
+    run_server()
+# --- MODIFICATIONS END ---

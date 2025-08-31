@@ -1,3 +1,11 @@
+# C:\Code\ADK_MCP_A2A\online_boutique\online_boutique_manager\agent.py
+
+# --- MODIFICATIONS START ---
+# Import necessary libraries for the web server
+import os
+from flask import Flask, jsonify
+# --- MODIFICATIONS END ---
+
 from google.adk.agents import LlmAgent, BaseAgent
 from google.adk.tools.agent_tool import AgentTool
 from google.adk.agents.invocation_context import InvocationContext
@@ -127,6 +135,7 @@ payment_processor_a2a_agent = a2a_agents["payment_processor"]
 shipping_coordinator_a2a_agent = a2a_agents["shipping_coordinator"]
 marketing_manager_a2a_agent = a2a_agents["marketing_manager"]
 catalog_service_a2a_agent = a2a_agents["catalog_service"]
+print("A2A Agents initialized")
 
 online_boutique_coordinator = LlmAgent(
     name="online_boutique_coordinator",
@@ -150,3 +159,34 @@ online_boutique_coordinator = LlmAgent(
 )
 
 root_agent = online_boutique_coordinator
+
+# --- MODIFICATIONS START ---
+# This function starts a web server to keep the container running and handle health checks.
+def run_server(host="0.0.0.0", port=8080):
+    """Starts a Flask web server for the coordinator agent."""
+    app = Flask(__name__)
+
+    @app.route("/health")
+    def health_check():
+        """A simple health check endpoint that returns a 200 OK status."""
+        return jsonify({"status": "healthy"}), 200
+
+    @app.route("/")
+    def index():
+        """Main endpoint for the coordinator."""
+        return jsonify({
+            "message": "Online Boutique Coordinator is running.",
+            "status": "healthy"
+        })
+
+    # Get the port from the environment variable if it exists, otherwise use the default.
+    # This is crucial for GKE to route traffic correctly.
+    server_port = int(os.environ.get("PORT", port))
+    
+    print(f"🚀 Boutique Coordinator server starting on {host}:{server_port}")
+    app.run(host=host, port=server_port)
+
+# This allows running the server directly for testing if needed.
+if __name__ == '__main__':
+    run_server()
+# --- MODIFICATIONS END ---
