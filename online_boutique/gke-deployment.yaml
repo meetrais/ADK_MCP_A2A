@@ -462,10 +462,10 @@ metadata:
 spec:
   tls:
   - hosts:
-    - your-boutique-domain.com  # Replace with your domain
+    - online-boutique-gke-hackethon.com  # Replace with your domain
     secretName: boutique-tls
   rules:
-  - host: your-boutique-domain.com  # Replace with your domain
+  - host: online-boutique-gke-hackethon  # Replace with your domain
     http:
       paths:
       - path: /
