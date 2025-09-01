@@ -17,6 +17,7 @@ data:
   PRODUCT_MANAGER_URL: "http://product-manager"
   CUSTOMER_SERVICE_URL: "http://customer-service"
   PAYMENT_PROCESSOR_URL: "http://payment-processor"
+  SHIPPING_SERVICE_URL: "http://shipping-service"
   CATALOG_SERVICE_URL: "http://catalog-service"
 
 ---
@@ -309,6 +310,75 @@ spec:
   type: ClusterIP
 
 ---
+# Shipping Service Agent Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shipping-service
+  namespace: online-boutique
+  labels:
+    app: shipping-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: shipping-service
+  template:
+    metadata:
+      labels:
+        app: shipping-service
+    spec:
+      containers:
+      - name: shipping-service
+        image: "gcr.io/${PROJECT_ID}/online-boutique:${IMAGE_TAG}"
+        ports:
+        - containerPort: 8080
+        env:
+        - name: SERVICE_TYPE
+          value: "shipping-service"
+        - name: PORT
+          value: "8080"
+        envFrom:
+        - configMapRef:
+            name: boutique-config
+        - secretRef:
+            name: boutique-secrets
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+---
+# Shipping Service Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: shipping-service
+  namespace: online-boutique
+spec:
+  selector:
+    app: shipping-service
+  ports:
+  - port: 80
+    targetPort: 8080
+  type: ClusterIP
+
+---
 # Catalog Service Agent Deployment
 apiVersion: apps/v1
 kind: Deployment
@@ -443,29 +513,45 @@ spec:
   selector:
     app: boutique-coordinator
   ports:
-  - port: 80
+  - name: http
+    port: 80
     targetPort: 8080
-  type: LoadBalancer
+    protocol: TCP
+  type: ClusterIP
 
 ---
-# Ingress for external access
+# NodePort Service for external access
+apiVersion: v1
+kind: Service
+metadata:
+  name: boutique-nodeport
+  namespace: online-boutique
+spec:
+  type: NodePort
+  selector:
+    app: boutique-coordinator
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    nodePort: 30080
+    protocol: TCP
+
+---
+# Ingress for external access (alternative to LoadBalancer)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: boutique-ingress
   namespace: online-boutique
   annotations:
-    kubernetes.io/ingress.class: "gce"
-    kubernetes.io/ingress.global-static-ip-name: "boutique-ip"  # Optional: reserve static IP
-    nginx.ingress.kubernetes.io/rewrite-target: /
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"  # Optional: for SSL
+    cloud.google.com/global-static-ip-name: "boutique-ip"
+    networking.gke.io/managed-certificates: "boutique-ssl-cert"
+    kubernetes.io/ingress.allow-http: "false"
 spec:
-  tls:
-  - hosts:
-    - online-boutique-gke-hackethon.com  # Replace with your domain
-    secretName: boutique-tls
+  ingressClassName: gce
   rules:
-  - host: online-boutique-gke-hackethon  # Replace with your domain
+  - host: online-boutique-gke-hackethon.com
     http:
       paths:
       - path: /
@@ -475,6 +561,17 @@ spec:
             name: boutique-coordinator
             port:
               number: 80
+
+---
+# Managed SSL Certificate for GKE
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: boutique-ssl-cert
+  namespace: online-boutique
+spec:
+  domains:
+    - online-boutique-gke-hackethon.com
 
 ---
 # Horizontal Pod Autoscaler for Coordinator

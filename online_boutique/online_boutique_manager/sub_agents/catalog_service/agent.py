@@ -1,5 +1,10 @@
 from google.adk import Agent
-from . import prompt
+# Handle import for both direct execution and module usage
+try:
+    from . import prompt
+except ImportError:
+    # Direct execution - use absolute import
+    import prompt
 from flask import Flask, request, jsonify
 import json
 import requests
@@ -139,4 +144,5 @@ def run_server(host="0.0.0.0", port=8080):
 
 # Optional: You can add this to make the file runnable for local testing
 if __name__ == '__main__':
-    run_server()
+    print("🚀 Catalog Service Agent starting on port 8095...")
+    app.run(host="0.0.0.0", port=8095, debug=False)

@@ -18,7 +18,7 @@ COPY . .
 RUN pip install -e .
 
 # Install any additional dependencies not managed by pyproject.toml
-RUN pip install google-generativeai
+RUN pip install google-generativeai waitress
 
 # Expose the port that the application server will run on
 EXPOSE 8080
@@ -39,6 +39,9 @@ case "$SERVICE_TYPE" in\n\
   "product-manager")\n\
     python -c "from online_boutique_manager.sub_agents.product_manager.agent import run_server; run_server()"\n\
     ;;\n\
+  "shipping-service")\n\
+    python -c "from online_boutique_manager.sub_agents.shipping_service.agent import run_server; run_server()"\n\
+    ;;\n\
   "customer-service")\n\
     python -c "from online_boutique_manager.sub_agents.customer_service.agent import run_server; run_server()"\n\
     ;;\n\
@@ -53,7 +56,7 @@ case "$SERVICE_TYPE" in\n\
     ;;\n\
   *)\n\
     echo "Unknown SERVICE_TYPE: $SERVICE_TYPE"\n\
-    echo "Available types: mcp-server, product-manager, customer-service, payment-processor, catalog-service, boutique-coordinator"\n\
+    echo "Available types: mcp-server, product-manager, shipping-service, customer-service, payment-processor, catalog-service, boutique-coordinator"\n\
     exit 1\n\
     ;;\n\
 esac' > /app/start_service.sh && chmod +x /app/start_service.sh

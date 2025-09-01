@@ -1,7 +1,11 @@
+#!/usr/bin/env python3
+"""
+Customer Service Agent - Port 8091
+"""
+
 from flask import Flask, request, jsonify
 import requests
 
-# Flask app for A2A protocol
 app = Flask(__name__)
 
 def get_customer_support(inquiry: str) -> dict:

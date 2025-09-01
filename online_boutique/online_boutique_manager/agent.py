@@ -15,7 +15,12 @@ from typing import AsyncGenerator
 import requests
 import json
 
-from . import prompt
+# Handle import for both direct execution and module usage
+try:
+    from . import prompt
+except ImportError:
+    # Direct execution - use absolute import
+    import prompt
 
 MODEL = "gemini-2.5-flash"
 
@@ -105,9 +110,9 @@ A2A_AGENTS = {
         "url": "http://localhost:8092", 
         "description": "Call payment processor agent via A2A protocol for payment handling and checkout"
     },
-    "shipping_coordinator": {
+    "shipping_service": {
         "url": "http://localhost:8093", 
-        "description": "Call shipping coordinator agent via A2A protocol for order fulfillment and delivery"
+        "description": "Call shipping service agent via A2A protocol for shipping rates, tracking, and delivery information"
     },
     "marketing_manager": {
         "url": "http://localhost:8094", 
@@ -119,24 +124,30 @@ A2A_AGENTS = {
     },
 }
 
+print("🔧 Starting A2A agent initialization...")
+
 # Create A2A agent proxies from configuration
 a2a_agents = {}
 for agent_name, config in A2A_AGENTS.items():
+    print(f"  Creating {agent_name} agent proxy...")
     a2a_agents[agent_name] = A2AAgentProxy(
         name=agent_name,  # Use the exact name without suffix for tool recognition
         agent_url=config["url"],
         description=config["description"]
     )
+    print(f"  ✓ {agent_name} agent proxy created")
 
+print("🔧 Getting specific agent references...")
 # Get specific agents
 product_manager_a2a_agent = a2a_agents["product_manager"]
 customer_service_a2a_agent = a2a_agents["customer_service"]
 payment_processor_a2a_agent = a2a_agents["payment_processor"]
-shipping_coordinator_a2a_agent = a2a_agents["shipping_coordinator"]
+shipping_service_a2a_agent = a2a_agents["shipping_service"]
 marketing_manager_a2a_agent = a2a_agents["marketing_manager"]
 catalog_service_a2a_agent = a2a_agents["catalog_service"]
-print("A2A Agents initialized")
+print("✅ A2A Agents initialized")
 
+print("🔧 Creating LlmAgent coordinator...")
 online_boutique_coordinator = LlmAgent(
     name="online_boutique_coordinator",
     model=MODEL,
@@ -152,11 +163,12 @@ online_boutique_coordinator = LlmAgent(
         AgentTool(agent=product_manager_a2a_agent),      # A2A call via proxy
         AgentTool(agent=customer_service_a2a_agent),     # A2A call via proxy
         AgentTool(agent=payment_processor_a2a_agent),    # A2A call via proxy
-        AgentTool(agent=shipping_coordinator_a2a_agent), # A2A call via proxy
+        AgentTool(agent=shipping_service_a2a_agent),     # A2A call via proxy
         AgentTool(agent=marketing_manager_a2a_agent),    # A2A call via proxy
         AgentTool(agent=catalog_service_a2a_agent),      # A2A call via proxy
     ],
 )
+print("✅ LlmAgent coordinator created")
 
 root_agent = online_boutique_coordinator
 
@@ -165,6 +177,10 @@ root_agent = online_boutique_coordinator
 def run_server(host="0.0.0.0", port=8080):
     """Starts a Flask web server for the coordinator agent."""
     app = Flask(__name__)
+    
+    # Configure Flask for production
+    app.config['DEBUG'] = False
+    app.config['TESTING'] = False
 
     @app.route("/health")
     def health_check():
@@ -179,12 +195,164 @@ def run_server(host="0.0.0.0", port=8080):
             "status": "healthy"
         })
 
+    @app.route("/chat", methods=["POST"])
+    def chat():
+        """Chat endpoint for the coordinator agent."""
+        try:
+            from flask import request
+            from google.adk.agents.invocation_context import InvocationContext
+            from google.genai.types import Content, Part
+            
+            data = request.get_json()
+            
+            if not data or 'message' not in data:
+                return jsonify({"error": "No message provided"}), 400
+            
+            user_message = data['message']
+            print(f"🛍️ Coordinator received: {user_message}")
+            
+            # Use the agent more directly by calling its tools
+            print("🔄 Using online_boutique_coordinator tools...")
+            
+            # For product browsing requests, call product manager
+            if any(keyword in user_message.lower() for keyword in ['sweater', 'clothing', 'product', 'buy', 'looking for']):
+                try:
+                    print("🔍 Calling Product Manager Agent via HTTP...")
+                    
+                    response = requests.post(
+                        'http://localhost:8090/chat',
+                        json={'message': 'clothing'},
+                        headers={'Content-Type': 'application/json'},
+                        timeout=10
+                    )
+                    
+                    if response.status_code == 200:
+                        product_data = response.json()
+                        print(f"✅ Product Manager Response: {product_data}")
+                        
+                        return jsonify({
+                            "response": {
+                                "coordinator_message": "I found some great options for you!",
+                                "product_manager_data": product_data.get('response', {}),
+                                "workflow": "Coordinator → Product Manager (HTTP) → MCP Server"
+                            },
+                            "agent": "online_boutique_coordinator", 
+                            "status": "success"
+                        })
+                    else:
+                        print(f"❌ Product Manager HTTP error: {response.status_code}")
+                        
+                except Exception as e:
+                    print(f"❌ Error calling product manager via HTTP: {str(e)}")
+            
+            # For catalog/search requests, call catalog service
+            elif any(keyword in user_message.lower() for keyword in ['search', 'categories', 'featured', 'find', 'browse categories', 'what categories']):
+                try:
+                    print("🔍 Calling Catalog Service Agent via HTTP...")
+                    
+                    # Determine query type based on user message
+                    if 'categories' in user_message.lower():
+                        query = 'categories'
+                    elif 'featured' in user_message.lower():
+                        query = 'featured'  
+                    elif 'search' in user_message.lower():
+                        query = 'search'
+                    else:
+                        query = 'categories'  # default
+                    
+                    response = requests.post(
+                        'http://localhost:8095/chat',
+                        json={'message': query},
+                        headers={'Content-Type': 'application/json'},
+                        timeout=10
+                    )
+                    
+                    if response.status_code == 200:
+                        catalog_data = response.json()
+                        print(f"✅ Catalog Service Response: {catalog_data}")
+                        
+                        return jsonify({
+                            "response": {
+                                "coordinator_message": "Here's what I found in our catalog!",
+                                "catalog_service_data": catalog_data.get('response', {}),
+                                "workflow": "Coordinator → Catalog Service (HTTP) → MCP Server"
+                            },
+                            "agent": "online_boutique_coordinator",
+                            "status": "success"
+                        })
+                    else:
+                        print(f"❌ Catalog Service HTTP error: {response.status_code}")
+                        
+                except Exception as e:
+                    print(f"❌ Error calling catalog service via HTTP: {str(e)}")
+            
+            # For shipping requests, call shipping service
+            elif any(keyword in user_message.lower() for keyword in ['shipping', 'delivery', 'ship', 'deliver', 'track', 'tracking', 'shipping cost', 'shipping rate', 'how long', 'when will', 'return policy']):
+                try:
+                    print("🚚 Calling Shipping Service Agent via HTTP...")
+                    
+                    # Determine shipping query type based on user message
+                    shipping_query = user_message.lower()
+                    if any(word in shipping_query for word in ['rate', 'cost', 'price', 'how much']):
+                        query = 'rates'
+                    elif any(word in shipping_query for word in ['track', 'tracking', 'where', 'status']):
+                        query = 'tracking'
+                    elif any(word in shipping_query for word in ['deliver', 'delivery', 'how long', 'when']):
+                        query = 'delivery'
+                    elif any(word in shipping_query for word in ['policy', 'return', 'exchange']):
+                        query = 'policies'
+                    else:
+                        query = 'general'  # general shipping info
+                    
+                    response = requests.post(
+                        'http://localhost:8093/chat',
+                        json={'message': query},
+                        headers={'Content-Type': 'application/json'},
+                        timeout=10
+                    )
+                    
+                    if response.status_code == 200:
+                        shipping_data = response.json()
+                        print(f"✅ Shipping Service Response: {shipping_data}")
+                        
+                        return jsonify({
+                            "response": {
+                                "coordinator_message": "Here's the shipping information you requested!",
+                                "shipping_service_data": shipping_data.get('response', {}),
+                                "workflow": "Coordinator → Shipping Service (HTTP)"
+                            },
+                            "agent": "online_boutique_coordinator",
+                            "status": "success"
+                        })
+                    else:
+                        print(f"❌ Shipping Service HTTP error: {response.status_code}")
+                        
+                except Exception as e:
+                    print(f"❌ Error calling shipping service via HTTP: {str(e)}")
+            
+            # Fallback response
+            return jsonify({
+                "response": f"Hello! I'm your Online Boutique Coordinator. I can help you find products, process orders, and provide customer support. You asked about: '{user_message}'. Try asking about clothing, sweaters, or other products!",
+                "agent": "online_boutique_coordinator",
+                "status": "success"
+            })
+            
+        except Exception as e:
+            print(f"❌ Error in coordinator: {str(e)}")
+            return jsonify({
+                "error": f"Error processing request: {str(e)}",
+                "status": "error"
+            }), 500
+
     # Get the port from the environment variable if it exists, otherwise use the default.
     # This is crucial for GKE to route traffic correctly.
     server_port = int(os.environ.get("PORT", port))
     
     print(f"🚀 Boutique Coordinator server starting on {host}:{server_port}")
-    app.run(host=host, port=server_port)
+    
+    # Use Flask's built-in server
+    print(f"Using Flask development server")
+    app.run(host=host, port=server_port, debug=False, threaded=True)
 
 # This allows running the server directly for testing if needed.
 if __name__ == '__main__':

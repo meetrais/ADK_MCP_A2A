@@ -493,18 +493,13 @@ def home():
 
 # --- MODIFICATIONS START ---
 # This function is now the main entry point for starting the server.
-def run_server(host="0.0.0.0", port=8080):
-    """Starts the MCP Flask server."""
-    # Get the port from the environment variable if it exists, otherwise use the default.
-    # This is crucial for GKE to route traffic correctly.
-    server_port = int(os.environ.get("PORT", port))
-    
+def run_server(host="0.0.0.0", port=3002):
+    """Starts the MCP Flask server on port 3002."""
     print("🚀 Online Boutique MCP Server starting...")
-    print(f"🛍️ Listening on {host}:{server_port}")
+    print(f"🛍️ Listening on {host}:{port}")
     
-    # Run the app on host '0.0.0.0' to be accessible within the container
-    # and on the port specified by the environment variable.
-    app.run(host=host, port=server_port, debug=False)
+    # Run the MCP server on fixed port 3002
+    app.run(host=host, port=port, debug=False)
 
 if __name__ == '__main__':
     run_server()
