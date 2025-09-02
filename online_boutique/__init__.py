@@ -1,4 +1,3 @@
-# Online Boutique Multi-Agent System
 """
 Online Boutique - A multi-agent e-commerce system
 
@@ -7,7 +6,7 @@ a multi-agent architecture with the following components:
 
 - Main Agent: online_boutique_manager (coordinates the entire shopping experience)
 - Sub-agents:
-  * product_manager: Handles product catalog and inventory
+  * shipping_service: Handles shipping and delivery management
   * customer_service: Provides customer support and assistance
   * payment_processor: Manages secure payment processing
   * shipping_coordinator: Coordinates order fulfillment and delivery

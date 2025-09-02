@@ -45,11 +45,11 @@ Ensure all state keys are correctly used to pass information between sub-agents.
 Here's the step-by-step breakdown.
 For each step, explicitly call the designated sub-agent and adhere strictly to the specified input and output formats:
 
-* Product Discovery and Catalog Management (Sub-agent: product_manager)
+* Shipping and Delivery Management (Sub-agent: shipping_service)
 
-Input: Prompt the customer to specify what type of products they're looking for (e.g., clothing, accessories, shoes) or let them browse categories.
-Action: Call the product_manager sub-agent, passing the customer's product interests or category preferences.
-Expected Output: The product_manager sub-agent MUST return a comprehensive product catalog with available items, prices, descriptions, and inventory status.
+Input: Prompt the customer for shipping preferences, delivery address, or tracking information.
+Action: Call the shipping_service sub-agent, passing the customer's shipping requirements or tracking requests.
+Expected Output: The shipping_service sub-agent MUST return shipping options, delivery estimates, tracking information, and logistics details.
 
 * Customer Support and Assistance (Sub-agent: customer_service)
 

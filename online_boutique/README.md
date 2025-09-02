@@ -6,7 +6,7 @@ This is an online boutique application built with a multi-agent architecture usi
 
 - **Root Agent**: Online Boutique Coordinator - orchestrates the entire shopping experience
 - **Sub-Agents**: Specialized agents for different e-commerce functions via A2A protocol
-  - Product Manager Agent
+  - Shipping Service Agent
   - Customer Service Agent  
   - Payment Processor Agent
   - Catalog Service Agent

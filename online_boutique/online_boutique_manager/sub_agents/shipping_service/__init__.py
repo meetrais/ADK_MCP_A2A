@@ -1,6 +1,4 @@
-# Product Manager Agent
-
 """
-Product manager agent for handling product catalog management,
-inventory tracking, and product discovery.
+Shipping service agent for handling shipping and delivery management,
+tracking shipments, and logistics coordination.
 """

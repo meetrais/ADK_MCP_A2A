@@ -14,7 +14,7 @@ metadata:
   namespace: online-boutique
 data:
   MCP_SERVER_URL: "http://mcp-server"
-  PRODUCT_MANAGER_URL: "http://product-manager"
+  SHIPPING_SERVICE_URL: "http://shipping-service"
   CUSTOMER_SERVICE_URL: "http://customer-service"
   PAYMENT_PROCESSOR_URL: "http://payment-processor"
   SHIPPING_SERVICE_URL: "http://shipping-service"

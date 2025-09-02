@@ -13,7 +13,7 @@ A sophisticated multi-agent financial advisory system that provides comprehensiv
 ## 2. Online Boutique Management System
 
 A comprehensive multi-agent e-commerce system that provides complete online shopping experience through specialized sub-agents:
-- **Product Manager Agent** - Product catalog and inventory management
+- **Shipping Service Agent** - Shipping and delivery management
 - **Customer Service Agent** - Customer support and assistance  
 - **Payment Processor Agent** - Secure payment processing and checkout
 - **Catalog Service Agent** - Advanced catalog management and search
