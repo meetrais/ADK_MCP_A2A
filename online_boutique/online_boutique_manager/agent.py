@@ -49,6 +49,9 @@ class A2AAgentProxy(BaseAgent):
                     response_text = json.dumps(response_payload, indent=2)
                 else:
                     response_text = str(response_payload)
+                
+                # Add subagent info to the response
+                response_text = f"[SUBAGENT:{self.name}] {response_text}"
             else:
                 response_text = f"Error calling {self.name}: HTTP {response.status_code}"
                 
@@ -89,10 +92,6 @@ A2A_AGENTS = {
         "url": "http://localhost:8092", 
         "description": "Call payment processor agent via A2A protocol for payment handling and checkout"
     },
-    "shipping_service": {
-        "url": "http://localhost:8093", 
-        "description": "Call shipping service agent via A2A protocol for shipping rates, tracking, and delivery information"
-    },
     "marketing_manager": {
         "url": "http://localhost:8094", 
         "description": "Call marketing manager agent via A2A protocol for promotions and recommendations"
@@ -114,7 +113,6 @@ for agent_name, config in A2A_AGENTS.items():
 shipping_service_a2a_agent = a2a_agents["shipping_service"]
 customer_service_a2a_agent = a2a_agents["customer_service"]
 payment_processor_a2a_agent = a2a_agents["payment_processor"]
-shipping_service_a2a_agent = a2a_agents["shipping_service"]
 marketing_manager_a2a_agent = a2a_agents["marketing_manager"]
 catalog_service_a2a_agent = a2a_agents["catalog_service"]
 
@@ -133,7 +131,6 @@ online_boutique_coordinator = LlmAgent(
         AgentTool(agent=shipping_service_a2a_agent),
         AgentTool(agent=customer_service_a2a_agent),
         AgentTool(agent=payment_processor_a2a_agent),
-        AgentTool(agent=shipping_service_a2a_agent),
         AgentTool(agent=marketing_manager_a2a_agent),
         AgentTool(agent=catalog_service_a2a_agent),
     ],
@@ -161,8 +158,8 @@ def run_server(host="0.0.0.0", port=8080):
     def chat():
         try:
             from flask import request
-            from google.adk.agents.invocation_context import InvocationContext
-            from google.genai.types import Content, Part
+            import asyncio
+            import re
             
             data = request.get_json()
             
@@ -171,104 +168,84 @@ def run_server(host="0.0.0.0", port=8080):
             
             user_message = data['message']
             
-            if any(keyword in user_message.lower() for keyword in ['shipping', 'delivery', 'track', 'ship', 'logistics']):
+            async def run_coordinator():
                 try:
-                    response = requests.post(
-                        'http://localhost:8090/chat',
-                        json={'message': 'shipping'},
-                        headers={'Content-Type': 'application/json'},
-                        timeout=10
+                    from google.adk.agents.invocation_context import InvocationContext
+                    from google.genai.types import Content, Part
+                    
+                    # Create proper invocation context
+                    message_content = Content(
+                        role='user',
+                        parts=[Part(text=user_message)]
                     )
                     
-                    if response.status_code == 200:
-                        shipping_data = response.json()
-                        return jsonify({
-                            "response": {
-                                "coordinator_message": "I can help you with shipping information!",
-                                "shipping_service_data": shipping_data.get('response', {}),
-                                "workflow": "Coordinator → Shipping Service (HTTP) → MCP Server"
-                            },
-                            "agent": "online_boutique_coordinator", 
-                            "status": "success"
-                        })
+                    ctx = InvocationContext()
+                    ctx.message = message_content
+                    
+                    # Collect all events from the agent
+                    events = []
+                    subagent_used = None
+                    
+                    print(f"🔄 Running coordinator for message: {user_message}")
+                    
+                    async for event in online_boutique_coordinator._run_async_impl(ctx):
+                        events.append(event)
+                        print(f"📝 Event received: {event}")
                         
+                        # Check if this event contains subagent information
+                        if hasattr(event, 'content') and event.content and event.content.parts:
+                            event_text = event.content.parts[0].text
+                            print(f"📄 Event text: {event_text}")
+                            subagent_match = re.search(r'\[SUBAGENT:([^\]]+)\]', event_text)
+                            if subagent_match:
+                                subagent_used = subagent_match.group(1)
+                                print(f"🎯 Subagent detected: {subagent_used}")
+                    
+                    # Get the final response
+                    if events:
+                        last_event = events[-1]
+                        if hasattr(last_event, 'content') and last_event.content and last_event.content.parts:
+                            response_text = last_event.content.parts[0].text
+                            
+                            # Clean up the subagent marker from the response
+                            response_text = re.sub(r'\[SUBAGENT:[^\]]+\]\s*', '', response_text)
+                            
+                            result = {
+                                "response": response_text,
+                                "agent": "online_boutique_coordinator",
+                                "status": "success",
+                                "workflow": "ADK LlmAgent with HTTP service"
+                            }
+                            
+                            # Add subagent field if a subagent was used
+                            if subagent_used:
+                                result["subagent"] = subagent_used
+                            
+                            return result
+                    
+                    # Fallback if no events
+                    return {
+                        "response": f"I received your message: '{user_message}'. Let me help you with that!",
+                        "agent": "online_boutique_coordinator",
+                        "status": "success"
+                    }
+                    
                 except Exception as e:
-                    pass
+                    print(f"❌ Error in coordinator: {str(e)}")
+                    return {
+                        "response": f"I received your message: '{user_message}'. Let me help you with that!",
+                        "agent": "online_boutique_coordinator",
+                        "status": "success",
+                        "error_details": str(e)
+                    }
             
-            elif any(keyword in user_message.lower() for keyword in ['search', 'categories', 'featured', 'find', 'browse categories', 'what categories']):
-                try:
-                    if 'categories' in user_message.lower():
-                        query = 'categories'
-                    elif 'featured' in user_message.lower():
-                        query = 'featured'  
-                    elif 'search' in user_message.lower():
-                        query = 'search'
-                    else:
-                        query = 'categories'
-                    
-                    response = requests.post(
-                        'http://localhost:8095/chat',
-                        json={'message': query},
-                        headers={'Content-Type': 'application/json'},
-                        timeout=10
-                    )
-                    
-                    if response.status_code == 200:
-                        catalog_data = response.json()
-                        return jsonify({
-                            "response": {
-                                "coordinator_message": "Here's what I found in our catalog!",
-                                "catalog_service_data": catalog_data.get('response', {}),
-                                "workflow": "Coordinator → Catalog Service (HTTP) → MCP Server"
-                            },
-                            "agent": "online_boutique_coordinator",
-                            "status": "success"
-                        })
-                        
-                except Exception as e:
-                    pass
-            
-            elif any(keyword in user_message.lower() for keyword in ['shipping', 'delivery', 'ship', 'deliver', 'track', 'tracking', 'shipping cost', 'shipping rate', 'how long', 'when will', 'return policy']):
-                try:
-                    shipping_query = user_message.lower()
-                    if any(word in shipping_query for word in ['rate', 'cost', 'price', 'how much']):
-                        query = 'rates'
-                    elif any(word in shipping_query for word in ['track', 'tracking', 'where', 'status']):
-                        query = 'tracking'
-                    elif any(word in shipping_query for word in ['deliver', 'delivery', 'how long', 'when']):
-                        query = 'delivery'
-                    elif any(word in shipping_query for word in ['policy', 'return', 'exchange']):
-                        query = 'policies'
-                    else:
-                        query = 'general'
-                    
-                    response = requests.post(
-                        'http://localhost:8093/chat',
-                        json={'message': query},
-                        headers={'Content-Type': 'application/json'},
-                        timeout=10
-                    )
-                    
-                    if response.status_code == 200:
-                        shipping_data = response.json()
-                        return jsonify({
-                            "response": {
-                                "coordinator_message": "Here's the shipping information you requested!",
-                                "shipping_service_data": shipping_data.get('response', {}),
-                                "workflow": "Coordinator → Shipping Service (HTTP)"
-                            },
-                            "agent": "online_boutique_coordinator",
-                            "status": "success"
-                        })
-                        
-                except Exception as e:
-                    pass
-            
-            return jsonify({
-                "response": f"Hello! I'm your Online Boutique Coordinator. I can help you find products, process orders, and provide customer support. You asked about: '{user_message}'. Try asking about clothing, sweaters, or other products!",
-                "agent": "online_boutique_coordinator",
-                "status": "success"
-            })
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = loop.run_until_complete(run_coordinator())
+                return jsonify(result)
+            finally:
+                loop.close()
             
         except Exception as e:
             return jsonify({
