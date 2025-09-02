@@ -17,6 +17,76 @@ except ImportError:
 
 MODEL = "gemini-2.5-flash"
 
+def get_fallback_response(agent_name, user_message):
+    """Provide helpful fallback responses when sub-agents are unavailable"""
+    
+    fallback_responses = {
+        "catalog_service": f"I'd be happy to help you find what you're looking for! While our product search system is temporarily unavailable, I can still assist you. What specific item are you interested in? You can also try browsing our main categories or contact us directly for personalized assistance.",
+        
+        "shipping_service": f"I can help with your shipping inquiry! While our shipping system is temporarily unavailable, here's some general information: We typically offer standard (5-7 business days) and express (2-3 business days) shipping options. For specific rates and tracking information, please contact our customer service team or try again in a few minutes.",
+        
+        "customer_service": f"I'm here to help you! While our customer service system is temporarily unavailable, I can still provide basic assistance. What do you need help with? For urgent matters, you can also reach us directly via phone or email.",
+        
+        "payment_processor": f"I can assist with your payment question! While our payment system is temporarily unavailable, we accept all major credit cards, PayPal, and other secure payment methods. For specific billing inquiries, please contact our support team or try again shortly.",
+        
+        "marketing_manager": f"I'd love to give you some recommendations! While our recommendation system is temporarily unavailable, I can suggest checking out our featured collections, new arrivals, or bestsellers. What type of items are you interested in?"
+    }
+    
+    return fallback_responses.get(agent_name, f"I'm here to help with your request about '{user_message}'. While our system is temporarily unavailable, please feel free to contact us directly or try again in a few minutes.")
+
+def format_subagent_response(agent_name, response_data, user_message):
+    """Use LLM to convert sub-agent technical response into natural, user-friendly language"""
+    
+    try:
+        from google.genai import types
+        import google.genai as genai
+        import json
+        
+        # Convert response_data to string for the LLM
+        if isinstance(response_data, dict):
+            data_str = json.dumps(response_data, indent=2)
+        else:
+            data_str = str(response_data)
+        
+        formatting_prompt = f"""
+You are a helpful customer service representative at an online boutique. A customer asked: "{user_message}"
+
+Our {agent_name.replace('_', ' ')} system provided this technical data:
+{data_str}
+
+Convert this technical information into a natural, helpful response that directly addresses the customer's request. Make it conversational, friendly, and actionable. Focus on what the customer actually wants to know.
+
+Guidelines:
+- Speak directly to the customer's request
+- Use natural, conversational language
+- Highlight relevant information from the data
+- Suggest next steps or actions
+- Keep it concise but helpful
+- Don't mention technical terms or system names
+
+Respond as if you're speaking directly to the customer.
+"""
+
+        # Use LLM to format the response naturally
+        client = genai.Client(api_key=os.environ.get('GOOGLE_API_KEY', ''))
+        
+        response = client.models.generate_content(
+            model=MODEL,
+            contents=[types.Content(
+                role='user',
+                parts=[types.Part(text=formatting_prompt)]
+            )]
+        )
+        
+        formatted_response = response.candidates[0].content.parts[0].text.strip()
+        return formatted_response
+        
+    except Exception as e:
+        print(f"⚠️ LLM formatting failed: {str(e)}, using fallback")
+        # Fallback to simple formatting
+        agent_display_name = agent_name.replace('_', ' ').title()
+        return f"I've consulted our {agent_display_name} regarding your request: '{user_message}'. Let me help you find what you're looking for!"
+
 class A2AAgentProxy(BaseAgent):
     def __init__(self, name: str, agent_url: str, description: str = None):
         super().__init__(
@@ -81,7 +151,7 @@ class A2AAgentProxy(BaseAgent):
 
 A2A_AGENTS = {
     "shipping_service": {
-        "url": "http://localhost:8090",
+        "url": "http://localhost:8093",
         "description": "Call shipping service agent via A2A protocol for shipping and delivery management"
     },
     "customer_service": {
@@ -237,7 +307,7 @@ Respond with ONLY the agent name (e.g., "catalog_service"). Do not include any e
                         # Map agent names to URLs
                         agent_urls = {
                             "catalog_service": "http://localhost:8095",
-                            "shipping_service": "http://localhost:8090",
+                            "shipping_service": "http://localhost:8093",
                             "customer_service": "http://localhost:8091", 
                             "payment_processor": "http://localhost:8092",
                             "marketing_manager": "http://localhost:8094"
@@ -258,17 +328,37 @@ Respond with ONLY the agent name (e.g., "catalog_service"). Do not include any e
                         if response.status_code == 200:
                             subagent_data = response.json()
                             print(f"✅ Subagent response: {subagent_data}")
-                            tool_response = subagent_data.get('response', 'No response from subagent')
+                            
+                            # Format the response in a user-friendly way
+                            raw_response = subagent_data.get('response', 'No response from subagent')
+                            
+                            # If response is a dict/JSON, format it nicely
+                            if isinstance(raw_response, dict):
+                                tool_response = format_subagent_response(subagent_used, raw_response, user_message)
+                            elif isinstance(raw_response, str) and raw_response.startswith('{'):
+                                # Try to parse JSON string
+                                try:
+                                    import json
+                                    parsed_response = json.loads(raw_response)
+                                    tool_response = format_subagent_response(subagent_used, parsed_response, user_message)
+                                except:
+                                    tool_response = raw_response
+                            else:
+                                tool_response = raw_response
                         else:
                             print(f"❌ Subagent HTTP error: {response.status_code}")
                             tool_response = f"Error calling {subagent_used}: HTTP {response.status_code}"
                             
                     except Exception as e:
                         print(f"❌ Error calling subagent: {str(e)}")
-                        tool_response = f"Error using {subagent_used}: {str(e)}"
+                        # Provide a user-friendly fallback response when sub-agent is unavailable
+                        if "Connection" in str(e) or "refused" in str(e):
+                            tool_response = get_fallback_response(subagent_used, user_message)
+                        else:
+                            tool_response = f"I'm having trouble accessing our {subagent_used.replace('_', ' ')} system right now. Please try again in a moment."
                     
-                    # Create coordinator response
-                    response_text = f"I've used our {subagent_used.replace('_', ' ')} to help you. {tool_response}"
+                    # Use the formatted response directly
+                    response_text = tool_response
                     
                     result = {
                         "response": response_text,
