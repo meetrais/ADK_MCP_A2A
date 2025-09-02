@@ -1,0 +1,64 @@
+# Virtual environments
+myenv/
+venv/
+env/
+.venv/
+
+# Python cache and build files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation files (but keep README.md as it's required by pyproject.toml)
+docs/*.md
+# *.md
+# !README.md
+
+# Test files
+test_*.py
+*_test.py
+tests/
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*.temp

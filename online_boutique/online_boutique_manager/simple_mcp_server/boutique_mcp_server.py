@@ -493,13 +493,23 @@ def home():
 
 # --- MODIFICATIONS START ---
 # This function is now the main entry point for starting the server.
-def run_server(host="0.0.0.0", port=3002):
-    """Starts the MCP Flask server on port 3002."""
+def run_server(host="0.0.0.0", port=None):
+    """Starts the MCP Flask server."""
+    # Get port from environment variable, fallback to 3002 for local dev or 8080 for container
+    if port is None:
+        port = int(os.environ.get("PORT", 8080))
+    
     print("🚀 Online Boutique MCP Server starting...")
     print(f"🛍️ Listening on {host}:{port}")
     
-    # Run the MCP server on fixed port 3002
-    app.run(host=host, port=port, debug=False)
+    # Use waitress for production deployment instead of Flask dev server
+    try:
+        from waitress import serve
+        print("Using Waitress WSGI server for production")
+        serve(app, host=host, port=port)
+    except ImportError:
+        print("Waitress not available, using Flask dev server")
+        app.run(host=host, port=port, debug=False)
 
 if __name__ == '__main__':
     run_server()

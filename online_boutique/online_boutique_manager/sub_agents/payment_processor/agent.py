@@ -128,28 +128,8 @@ def health_check():
     """Health check endpoint"""
     return jsonify({"status": "healthy", "agent": "payment_processor_agent"})
 
-def run_server(host="0.0.0.0", port=8080):
-    """Starts a Flask web server for the agent."""
-    app = Flask(__name__)
-
-    @app.route("/health")
-    def health_check():
-        """A simple health check endpoint that returns a 200 OK status."""
-        return jsonify({"status": "healthy"}), 200
-
-    @app.route("/")
-    def index():
-        """Main endpoint for the agent."""
-        # You can customize this message for each agent
-        return jsonify({"message": "Agent is running and healthy."})
-
-    # Get the port from the environment variable for GKE
-    server_port = int(os.environ.get("PORT", port))
-    
-    print(f"🚀 Agent server starting on {host}:{server_port}")
-    app.run(host=host, port=server_port)
-
-# Optional: You can add this to make the file runnable for local testing
 if __name__ == '__main__':
-    print("🚀 Payment Processor Agent starting on port 8092...")
-    app.run(host="0.0.0.0", port=8092, debug=False)
+    # Get the port from the environment variable for GKE, fallback to 8080
+    server_port = int(os.environ.get("PORT", 8080))
+    print(f"🚀 Payment Processor Agent starting on port {server_port}...")
+    app.run(host="0.0.0.0", port=server_port, debug=False)

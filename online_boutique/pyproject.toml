@@ -4,7 +4,7 @@ version = "0.1"
 description = "AI-driven multi-agent e-commerce system designed to provide comprehensive online shopping experience"
 authors = ["Online Boutique Team"]
 license = "Apache-2.0"
-readme = "README.md"
+# readme = "README.md"  # Commented out to fix Docker build
 packages = [{ include = "online_boutique_manager" }]
 
 [tool.poetry.dependencies]

@@ -1,0 +1,10 @@
+myenv
+*.pyc
+__pycache__
+.git
+.vscode
+.idea
+*.log
+*.tmp
+README.md
+test_*.py

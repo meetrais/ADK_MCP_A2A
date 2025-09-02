@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 import requests
+import os
 
 # Flask app for A2A protocol
 app = Flask(__name__)
@@ -9,8 +10,13 @@ def get_customer_support(inquiry: str) -> dict:
     try:
         print(f"Customer Service: Calling MCP server for inquiry: {inquiry}")
         
+        # Use service name in Kubernetes, fallback to localhost for local dev
+        mcp_url = os.environ.get('MCP_SERVER_URL', 'http://localhost:3002')
+        if not mcp_url.startswith('http'):
+            mcp_url = f'http://{mcp_url}'
+        
         response = requests.post(
-            'http://localhost:3002/customer-support',
+            f'{mcp_url}/customer-support',
             json={'inquiry': inquiry},
             timeout=10
         )
@@ -66,9 +72,11 @@ def get_agent_card():
     return jsonify({
         "name": "customer_service_agent",
         "description": "Customer service agent using MCP server",
-        "port": 8091
+        "port": int(os.environ.get("PORT", 8080))
     })
 
 if __name__ == '__main__':
-    print("🚀 Customer Service Agent starting on port 8091...")
-    app.run(host="0.0.0.0", port=8091, debug=False)
+    # Get the port from the environment variable for GKE, fallback to 8080
+    server_port = int(os.environ.get("PORT", 8080))
+    print(f"🚀 Customer Service Agent starting on port {server_port}...")
+    app.run(host="0.0.0.0", port=server_port, debug=False)

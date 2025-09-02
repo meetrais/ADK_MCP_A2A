@@ -13,12 +13,11 @@ metadata:
   name: boutique-config
   namespace: online-boutique
 data:
-  MCP_SERVER_URL: "http://mcp-server"
-  SHIPPING_SERVICE_URL: "http://shipping-service"
-  CUSTOMER_SERVICE_URL: "http://customer-service"
-  PAYMENT_PROCESSOR_URL: "http://payment-processor"
-  SHIPPING_SERVICE_URL: "http://shipping-service"
-  CATALOG_SERVICE_URL: "http://catalog-service"
+  MCP_SERVER_URL: "http://mcp-server:80"
+  SHIPPING_SERVICE_URL: "http://shipping-service:80"
+  CUSTOMER_SERVICE_URL: "http://customer-service:80"
+  PAYMENT_PROCESSOR_URL: "http://payment-processor:80"
+  CATALOG_SERVICE_URL: "http://catalog-service:80"
 
 ---
 # Secret for sensitive data - values will be injected from .env file during deployment
@@ -54,7 +53,7 @@ spec:
     spec:
       containers:
       - name: mcp-server
-        image: "gcr.io/${PROJECT_ID}/online-boutique:${IMAGE_TAG}"
+        image: "gcr.io/${PROJECT_ID}/online-boutique-service:${IMAGE_TAG}"
         ports:
         - containerPort: 8080
         env:
@@ -102,74 +101,6 @@ spec:
     targetPort: 8080
   type: ClusterIP
 
----
-# Product Manager Agent Deployment
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: product-manager
-  namespace: online-boutique
-  labels:
-    app: product-manager
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: product-manager
-  template:
-    metadata:
-      labels:
-        app: product-manager
-    spec:
-      containers:
-      - name: product-manager
-        image: "gcr.io/${PROJECT_ID}/online-boutique:${IMAGE_TAG}"
-        ports:
-        - containerPort: 8080
-        env:
-        - name: SERVICE_TYPE
-          value: "product-manager"
-        - name: PORT
-          value: "8080"
-        envFrom:
-        - configMapRef:
-            name: boutique-config
-        - secretRef:
-            name: boutique-secrets
-        resources:
-          requests:
-            memory: "512Mi"
-            cpu: "250m"
-          limits:
-            memory: "1Gi"
-            cpu: "500m"
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 8080
-          initialDelaySeconds: 30
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 8080
-          initialDelaySeconds: 5
-          periodSeconds: 5
-
----
-# Product Manager Service
-apiVersion: v1
-kind: Service
-metadata:
-  name: product-manager
-  namespace: online-boutique
-spec:
-  selector:
-    app: product-manager
-  ports:
-  - port: 80
-    targetPort: 8080
-  type: ClusterIP
 
 ---
 # Customer Service Agent Deployment
@@ -192,7 +123,7 @@ spec:
     spec:
       containers:
       - name: customer-service
-        image: "gcr.io/${PROJECT_ID}/online-boutique:${IMAGE_TAG}"
+        image: "gcr.io/${PROJECT_ID}/online-boutique-service:${IMAGE_TAG}"
         ports:
         - containerPort: 8080
         env:
@@ -261,7 +192,7 @@ spec:
     spec:
       containers:
       - name: payment-processor
-        image: "gcr.io/${PROJECT_ID}/online-boutique:${IMAGE_TAG}"
+        image: "gcr.io/${PROJECT_ID}/online-boutique-service:${IMAGE_TAG}"
         ports:
         - containerPort: 8080
         env:
@@ -330,7 +261,7 @@ spec:
     spec:
       containers:
       - name: shipping-service
-        image: "gcr.io/${PROJECT_ID}/online-boutique:${IMAGE_TAG}"
+        image: "gcr.io/${PROJECT_ID}/online-boutique-service:${IMAGE_TAG}"
         ports:
         - containerPort: 8080
         env:
@@ -399,7 +330,7 @@ spec:
     spec:
       containers:
       - name: catalog-service
-        image: "gcr.io/${PROJECT_ID}/online-boutique:${IMAGE_TAG}"
+        image: "gcr.io/${PROJECT_ID}/online-boutique-service:${IMAGE_TAG}"
         ports:
         - containerPort: 8080
         env:
@@ -468,7 +399,7 @@ spec:
     spec:
       containers:
       - name: boutique-coordinator
-        image: "gcr.io/${PROJECT_ID}/online-boutique:${IMAGE_TAG}"
+        image: "gcr.io/${PROJECT_ID}/online-boutique-service:${IMAGE_TAG}"
         ports:
         - containerPort: 8080
         env:
@@ -601,27 +532,6 @@ spec:
         type: Utilization
         averageUtilization: 80
 
----
-# Horizontal Pod Autoscaler for Product Manager
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: product-manager-hpa
-  namespace: online-boutique
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: product-manager
-  minReplicas: 2
-  maxReplicas: 8
-  metrics:
-  - type: Resource
-    resource:
-      name: cpu
-      target:
-        type: Utilization
-        averageUtilization: 70
 
 ---
 # Horizontal Pod Autoscaler for Customer Service

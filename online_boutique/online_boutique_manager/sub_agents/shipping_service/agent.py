@@ -195,6 +195,7 @@ def health_check():
     return jsonify({"status": "healthy", "agent": "shipping_service_agent"})
 
 if __name__ == '__main__':
-    # Run the shipping service agent on port 8093
-    print("🚀 Shipping Service Agent starting on port 8093...")
-    app.run(host="0.0.0.0", port=8093, debug=False)
+    # Get the port from the environment variable for GKE, fallback to 8080
+    server_port = int(os.environ.get("PORT", 8080))
+    print(f"🚀 Shipping Service Agent starting on port {server_port}...")
+    app.run(host="0.0.0.0", port=server_port, debug=False)
