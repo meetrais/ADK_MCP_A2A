@@ -168,67 +168,120 @@ def run_server(host="0.0.0.0", port=8080):
             
             user_message = data['message']
             
-            async def run_coordinator():
+            def run_coordinator():
                 try:
-                    from google.adk.agents.invocation_context import InvocationContext
-                    from google.genai.types import Content, Part
+                    print(f"🔄 Processing message with root_agent: {user_message}")
                     
-                    # Create proper invocation context
-                    message_content = Content(
-                        role='user',
-                        parts=[Part(text=user_message)]
-                    )
+                    # Use LLM to determine which sub-agent to route to
+                    from google.genai import types
+                    import google.genai as genai
                     
-                    ctx = InvocationContext()
-                    ctx.message = message_content
-                    
-                    # Collect all events from the agent
-                    events = []
-                    subagent_used = None
-                    
-                    print(f"🔄 Running coordinator for message: {user_message}")
-                    
-                    async for event in online_boutique_coordinator._run_async_impl(ctx):
-                        events.append(event)
-                        print(f"📝 Event received: {event}")
+                    routing_prompt = f"""
+You are an intelligent routing system for an online boutique. Analyze the user's message and determine which specialized agent should handle their request.
+
+Available agents and their capabilities:
+- catalog_service: Product search, browsing, finding items, product information, inventory queries
+- shipping_service: Shipping rates, delivery times, tracking packages, logistics questions
+- customer_service: General help, support questions, complaints, returns, exchanges, order issues
+- payment_processor: Payment methods, billing questions, checkout problems, transaction issues
+- marketing_manager: Product recommendations, promotions, trending items, personalized suggestions
+
+User message: "{user_message}"
+
+Based on the user's intent and the nature of their request, which agent would be most appropriate to handle this?
+
+Respond with ONLY the agent name (e.g., "catalog_service"). Do not include any explanation or additional text.
+"""
+
+                    try:
+                        # Use the existing Gemini client from ADK
+                        client = genai.Client(api_key=os.environ.get('GOOGLE_API_KEY', ''))
                         
-                        # Check if this event contains subagent information
-                        if hasattr(event, 'content') and event.content and event.content.parts:
-                            event_text = event.content.parts[0].text
-                            print(f"📄 Event text: {event_text}")
-                            subagent_match = re.search(r'\[SUBAGENT:([^\]]+)\]', event_text)
-                            if subagent_match:
-                                subagent_used = subagent_match.group(1)
-                                print(f"🎯 Subagent detected: {subagent_used}")
+                        response = client.models.generate_content(
+                            model=MODEL,
+                            contents=[types.Content(
+                                role='user',
+                                parts=[types.Part(text=routing_prompt)]
+                            )]
+                        )
+                        
+                        tool_to_use = response.candidates[0].content.parts[0].text.strip().lower()
+                        print(f"🤖 LLM routing decision: {tool_to_use}")
+                        
+                    except Exception as e:
+                        print(f"⚠️ LLM routing failed: {str(e)}, defaulting to catalog_service")
+                        tool_to_use = "catalog_service"
                     
-                    # Get the final response
-                    if events:
-                        last_event = events[-1]
-                        if hasattr(last_event, 'content') and last_event.content and last_event.content.parts:
-                            response_text = last_event.content.parts[0].text
-                            
-                            # Clean up the subagent marker from the response
-                            response_text = re.sub(r'\[SUBAGENT:[^\]]+\]\s*', '', response_text)
-                            
-                            result = {
-                                "response": response_text,
-                                "agent": "online_boutique_coordinator",
-                                "status": "success",
-                                "workflow": "ADK LlmAgent with HTTP service"
-                            }
-                            
-                            # Add subagent field if a subagent was used
-                            if subagent_used:
-                                result["subagent"] = subagent_used
-                            
-                            return result
-                    
-                    # Fallback if no events
-                    return {
-                        "response": f"I received your message: '{user_message}'. Let me help you with that!",
-                        "agent": "online_boutique_coordinator",
-                        "status": "success"
+                    # Map tool name to agent proxy
+                    available_tools = {
+                        "shipping_service": shipping_service_a2a_agent,
+                        "customer_service": customer_service_a2a_agent,
+                        "payment_processor": payment_processor_a2a_agent,
+                        "marketing_manager": marketing_manager_a2a_agent,
+                        "catalog_service": catalog_service_a2a_agent
                     }
+                    
+                    # Validate and get the tool
+                    if tool_to_use in available_tools:
+                        selected_tool = available_tools[tool_to_use]
+                        subagent_used = tool_to_use
+                    else:
+                        print(f"⚠️ Invalid tool '{tool_to_use}', defaulting to catalog_service")
+                        selected_tool = available_tools["catalog_service"]
+                        subagent_used = "catalog_service"
+                    
+                    print(f"🎯 Using tool: {subagent_used}")
+                    
+                    # Call the sub-agent via HTTP
+                    try:
+                        # Map agent names to URLs
+                        agent_urls = {
+                            "catalog_service": "http://localhost:8095",
+                            "shipping_service": "http://localhost:8090",
+                            "customer_service": "http://localhost:8091", 
+                            "payment_processor": "http://localhost:8092",
+                            "marketing_manager": "http://localhost:8094"
+                        }
+                        
+                        subagent_url = agent_urls.get(subagent_used, "http://localhost:8095")
+                        
+                        print(f"🌐 Calling {subagent_used} at {subagent_url}")
+                        
+                        # Make HTTP request to sub-agent
+                        response = requests.post(
+                            f"{subagent_url}/chat",
+                            json={"message": user_message},
+                            headers={"Content-Type": "application/json"},
+                            timeout=10
+                        )
+                        
+                        if response.status_code == 200:
+                            subagent_data = response.json()
+                            print(f"✅ Subagent response: {subagent_data}")
+                            tool_response = subagent_data.get('response', 'No response from subagent')
+                        else:
+                            print(f"❌ Subagent HTTP error: {response.status_code}")
+                            tool_response = f"Error calling {subagent_used}: HTTP {response.status_code}"
+                            
+                    except Exception as e:
+                        print(f"❌ Error calling subagent: {str(e)}")
+                        tool_response = f"Error using {subagent_used}: {str(e)}"
+                    
+                    # Create coordinator response
+                    response_text = f"I've used our {subagent_used.replace('_', ' ')} to help you. {tool_response}"
+                    
+                    result = {
+                        "response": response_text,
+                        "agent": "online_boutique_coordinator",
+                        "status": "success",
+                        "workflow": "ADK root_agent with LLM-selected tools"
+                    }
+                    
+                    # Add subagent field
+                    if subagent_used:
+                        result["subagent"] = subagent_used
+                    
+                    return result
                     
                 except Exception as e:
                     print(f"❌ Error in coordinator: {str(e)}")
@@ -239,13 +292,8 @@ def run_server(host="0.0.0.0", port=8080):
                         "error_details": str(e)
                     }
             
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                result = loop.run_until_complete(run_coordinator())
-                return jsonify(result)
-            finally:
-                loop.close()
+            result = run_coordinator()
+            return jsonify(result)
             
         except Exception as e:
             return jsonify({
