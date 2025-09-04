@@ -511,6 +511,8 @@ def run_server(host="0.0.0.0", port=None):
         print("Waitress not available, using Flask dev server")
         app.run(host=host, port=port, debug=False)
 
+# For Gunicorn compatibility - keep the function for backwards compatibility
+# but when using Gunicorn, it will directly use the 'app' object
 if __name__ == '__main__':
     run_server()
 # --- MODIFICATIONS END ---

@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y \
 COPY . .
 
 RUN pip install -e .
-RUN pip install google-generativeai waitress
+RUN pip install google-generativeai waitress gunicorn
 
 EXPOSE 8080
 
@@ -20,22 +20,22 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 RUN echo '#!/bin/bash\n\
 case "$SERVICE_TYPE" in\n\
   "mcp-server")\n\
-    python -c "from online_boutique_manager.simple_mcp_server.boutique_mcp_server import run_server; run_server()"\n\
+    gunicorn --bind 0.0.0.0:8080 --workers 2 --timeout 120 "online_boutique_manager.simple_mcp_server.boutique_mcp_server:app"\n\
     ;;\n\
   "shipping-service")\n\
-    python -m online_boutique_manager.sub_agents.shipping_service.agent\n\
+    gunicorn --bind 0.0.0.0:8080 --workers 2 --timeout 120 "online_boutique_manager.sub_agents.shipping_service.agent:app"\n\
     ;;\n\
   "customer-service")\n\
-    python -m online_boutique_manager.sub_agents.customer_service.agent\n\
+    gunicorn --bind 0.0.0.0:8080 --workers 2 --timeout 120 "online_boutique_manager.sub_agents.customer_service.agent:app"\n\
     ;;\n\
   "payment-processor")\n\
-    python -m online_boutique_manager.sub_agents.payment_processor.agent\n\
+    gunicorn --bind 0.0.0.0:8080 --workers 2 --timeout 120 "online_boutique_manager.sub_agents.payment_processor.agent:app"\n\
     ;;\n\
   "catalog-service")\n\
-    python -m online_boutique_manager.sub_agents.catalog_service.agent\n\
+    gunicorn --bind 0.0.0.0:8080 --workers 2 --timeout 120 "online_boutique_manager.sub_agents.catalog_service.agent:app"\n\
     ;;\n\
   "boutique-coordinator")\n\
-    python -m online_boutique_manager.agent\n\
+    gunicorn --bind 0.0.0.0:8080 --workers 2 --timeout 120 "online_boutique_manager.agent:app"\n\
     ;;\n\
   *)\n\
     echo "Unknown SERVICE_TYPE: $SERVICE_TYPE"\n\

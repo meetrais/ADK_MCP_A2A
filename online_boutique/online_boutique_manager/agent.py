@@ -149,25 +149,26 @@ class A2AAgentProxy(BaseAgent):
             pass
         return {"name": self.name, "status": "unavailable"}
 
+# Use environment variables for service URLs, fallback to localhost for local dev
 A2A_AGENTS = {
     "shipping_service": {
-        "url": "http://localhost:8093",
+        "url": os.environ.get("SHIPPING_SERVICE_URL", "http://localhost:8093"),
         "description": "Call shipping service agent via A2A protocol for shipping and delivery management"
     },
     "customer_service": {
-        "url": "http://localhost:8091", 
+        "url": os.environ.get("CUSTOMER_SERVICE_URL", "http://localhost:8091"), 
         "description": "Call customer service agent via A2A protocol for customer support and order assistance"
     },
     "payment_processor": {
-        "url": "http://localhost:8092", 
+        "url": os.environ.get("PAYMENT_PROCESSOR_URL", "http://localhost:8092"), 
         "description": "Call payment processor agent via A2A protocol for payment handling and checkout"
     },
     "marketing_manager": {
-        "url": "http://localhost:8094", 
+        "url": os.environ.get("MARKETING_MANAGER_URL", "http://localhost:8094"), 
         "description": "Call marketing manager agent via A2A protocol for promotions and recommendations"
     },
     "catalog_service": {
-        "url": "http://localhost:8095", 
+        "url": os.environ.get("CATALOG_SERVICE_URL", "http://localhost:8095"), 
         "description": "Call catalog service agent via A2A protocol for advanced catalog management and search"
     },
 }
@@ -208,24 +209,24 @@ online_boutique_coordinator = LlmAgent(
 
 root_agent = online_boutique_coordinator
 
-def run_server(host="0.0.0.0", port=8080):
-    app = Flask(__name__)
-    app.config['DEBUG'] = False
-    app.config['TESTING'] = False
+# Create Flask app at module level for Gunicorn compatibility
+app = Flask(__name__)
+app.config['DEBUG'] = False
+app.config['TESTING'] = False
 
-    @app.route("/health")
-    def health_check():
-        return jsonify({"status": "healthy"}), 200
+@app.route("/health")
+def health_check():
+    return jsonify({"status": "healthy"}), 200
 
-    @app.route("/")
-    def index():
-        return jsonify({
-            "message": "Online Boutique Coordinator is running.",
-            "status": "healthy"
-        })
+@app.route("/")
+def index():
+    return jsonify({
+        "message": "Online Boutique Coordinator is running.",
+        "status": "healthy"
+    })
 
-    @app.route("/chat", methods=["POST"])
-    def chat():
+@app.route("/chat", methods=["POST"])
+def chat():
         try:
             from flask import request
             import asyncio
@@ -304,16 +305,8 @@ Respond with ONLY the agent name (e.g., "catalog_service"). Do not include any e
                     
                     # Call the sub-agent via HTTP
                     try:
-                        # Map agent names to URLs
-                        agent_urls = {
-                            "catalog_service": "http://localhost:8095",
-                            "shipping_service": "http://localhost:8093",
-                            "customer_service": "http://localhost:8091", 
-                            "payment_processor": "http://localhost:8092",
-                            "marketing_manager": "http://localhost:8094"
-                        }
-                        
-                        subagent_url = agent_urls.get(subagent_used, "http://localhost:8095")
+                        # Use the same URLs from A2A_AGENTS configuration
+                        subagent_url = A2A_AGENTS[subagent_used]["url"]
                         
                         print(f"🌐 Calling {subagent_used} at {subagent_url}")
                         
@@ -391,6 +384,8 @@ Respond with ONLY the agent name (e.g., "catalog_service"). Do not include any e
                 "status": "error"
             }), 500
 
+def run_server(host="0.0.0.0", port=8080):
+    """Function kept for backwards compatibility when running directly"""
     server_port = int(os.environ.get("PORT", port))
     app.run(host=host, port=server_port, debug=False, threaded=True)
 

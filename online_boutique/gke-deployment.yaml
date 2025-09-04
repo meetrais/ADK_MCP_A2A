@@ -1,3 +1,5 @@
+# FINAL CORRECTED DEPLOYMENT FILE (v4)
+
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -28,9 +30,9 @@ metadata:
   namespace: online-boutique
 type: Opaque
 stringData:
-  GOOGLE_API_KEY: "${GOOGLE_API_KEY}"  # Will be read from environment
-  PROJECT_ID: "${PROJECT_ID}"         # Will be read from environment
-  IMAGE_TAG: "${IMAGE_TAG}"           # Will be read from environment
+  GOOGLE_API_KEY: "${GOOGLE_API_KEY}"
+  PROJECT_ID: "${PROJECT_ID}"
+  IMAGE_TAG: "${IMAGE_TAG}"
 
 ---
 # MCP Server Deployment
@@ -440,6 +442,8 @@ kind: Service
 metadata:
   name: boutique-coordinator
   namespace: online-boutique
+  annotations:
+    cloud.google.com/backend-config: '{"ports": {"http":"boutique-backendconfig"}}'
 spec:
   selector:
     app: boutique-coordinator
@@ -449,6 +453,24 @@ spec:
     targetPort: 8080
     protocol: TCP
   type: ClusterIP
+
+---
+# NEW RESOURCE TO CONFIGURE THE EXTERNAL HEALTH CHECK
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: boutique-backendconfig
+  namespace: online-boutique
+spec:
+  healthCheck:
+    checkIntervalSec: 15
+    timeoutSec: 5
+    healthyThreshold: 1
+    unhealthyThreshold: 2
+    type: HTTP
+    requestPath: /health
+    port: 8080
+# --- END OF NEW RESOURCE ---
 
 ---
 # NodePort Service for external access
@@ -478,7 +500,7 @@ metadata:
   annotations:
     cloud.google.com/global-static-ip-name: "boutique-ip"
     networking.gke.io/managed-certificates: "boutique-ssl-cert"
-    kubernetes.io/ingress.allow-http: "false"
+    kubernetes.io.ingress.allow-http: "true"
 spec:
   ingressClassName: gce
   rules:
@@ -578,7 +600,8 @@ spec:
         averageUtilization: 70
 
 ---
-# Network Policy for security (optional)
+# --- REPLACE your old NetworkPolicy with this TEMPORARY diagnostic one ---
+
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -590,12 +613,6 @@ spec:
   - Ingress
   - Egress
   ingress:
-  - from:
-    - namespaceSelector:
-        matchLabels:
-          name: online-boutique
-    - namespaceSelector:
-        matchLabels:
-          name: ingress-nginx  # Allow ingress controller
+  - {} # An empty ingress rule allows ALL incoming traffic
   egress:
-  - to: []  # Allow all egress traffic
+  - {} # An empty egress rule allows ALL outgoing traffic
