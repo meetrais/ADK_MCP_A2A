@@ -23,13 +23,9 @@ def get_catalog_data(query: str) -> dict:
         dict: Catalog data results from MCP server
     """
     try:
-        print(f"Calling MCP server for catalog query: {query}")  # Debug log
-        
         # Get MCP server URL from environment variable, fallback to localhost for local dev
         mcp_server_url = os.environ.get('MCP_SERVER_URL', 'http://localhost:3002')
         catalog_url = f"{mcp_server_url}/catalog-service"
-        
-        print(f"Calling MCP server at: {catalog_url}")  # Debug log
         
         # Call MCP server
         response = requests.post(
@@ -38,11 +34,8 @@ def get_catalog_data(query: str) -> dict:
             timeout=10
         )
         
-        print(f"MCP server response status: {response.status_code}")  # Debug log
-        
         if response.status_code == 200:
             result = response.json()
-            print(f"MCP server result: {result}")  # Debug log
             
             if result['status'] == 'success':
                 return result['data']
@@ -53,7 +46,6 @@ def get_catalog_data(query: str) -> dict:
         }
         
     except Exception as e:
-        print(f"Error calling MCP server: {str(e)}")  # Debug log
         return {
             'status': 'error',
             'message': f'Error connecting to MCP server: {str(e)}'
@@ -99,15 +91,11 @@ def chat():
         data = request.get_json()
         message = data.get('message', '')
         
-        print(f"A2A received message: {message}")  # Debug log
-        
         if not message:
             return jsonify({"error": "No message provided"}), 400
         
         # Directly call the tool function to bypass the complex runner
         response_text = get_catalog_data(query=message)
-        
-        print(f"A2A direct tool response: {response_text}")
         
         return jsonify({
             "response": response_text,
@@ -116,7 +104,6 @@ def chat():
         })
         
     except Exception as e:
-        print(f"Error in A2A chat endpoint: {str(e)}")  # Debug logging
         return jsonify({
             "error": str(e),
             "status": "error"

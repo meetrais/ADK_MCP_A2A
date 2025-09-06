@@ -23,8 +23,6 @@ def process_payment(cart_data: str) -> dict:
         dict: Payment processing results from MCP server
     """
     try:
-        print(f"Calling MCP server for payment processing: {cart_data}")  # Debug log
-        
         # Parse cart data if it's a string
         if isinstance(cart_data, str):
             try:
@@ -36,8 +34,6 @@ def process_payment(cart_data: str) -> dict:
         mcp_server_url = os.environ.get('MCP_SERVER_URL', 'http://localhost:3002')
         payment_url = f"{mcp_server_url}/payment-process"
         
-        print(f"Calling MCP server at: {payment_url}")  # Debug log
-        
         # Call MCP server
         response = requests.post(
             payment_url,
@@ -45,11 +41,8 @@ def process_payment(cart_data: str) -> dict:
             timeout=10
         )
         
-        print(f"MCP server response status: {response.status_code}")  # Debug log
-        
         if response.status_code == 200:
             result = response.json()
-            print(f"MCP server result: {result}")  # Debug log
             
             if result['status'] == 'success':
                 return result['data']
@@ -60,7 +53,6 @@ def process_payment(cart_data: str) -> dict:
         }
         
     except Exception as e:
-        print(f"Error calling MCP server: {str(e)}")  # Debug log
         return {
             'status': 'error',
             'message': f'Error connecting to MCP server: {str(e)}'
@@ -106,15 +98,11 @@ def chat():
         data = request.get_json()
         message = data.get('message', '')
         
-        print(f"A2A received message: {message}")  # Debug log
-        
         if not message:
             return jsonify({"error": "No message provided"}), 400
         
         # Directly call the tool function to bypass the complex runner
         response_text = process_payment(cart_data=message)
-        
-        print(f"A2A direct tool response: {response_text}")
         
         return jsonify({
             "response": response_text,
@@ -123,7 +111,6 @@ def chat():
         })
         
     except Exception as e:
-        print(f"Error in A2A chat endpoint: {str(e)}")  # Debug logging
         return jsonify({
             "error": str(e),
             "status": "error"

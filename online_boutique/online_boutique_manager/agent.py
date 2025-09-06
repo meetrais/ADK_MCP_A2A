@@ -241,8 +241,6 @@ def chat():
             
             def run_coordinator():
                 try:
-                    print(f"🔄 Processing message with root_agent: {user_message}")
-                    
                     # Use LLM to determine which sub-agent to route to
                     from google.genai import types
                     import google.genai as genai
@@ -277,10 +275,8 @@ Respond with ONLY the agent name (e.g., "catalog_service"). Do not include any e
                         )
                         
                         tool_to_use = response.candidates[0].content.parts[0].text.strip().lower()
-                        print(f"🤖 LLM routing decision: {tool_to_use}")
                         
-                    except Exception as e:
-                        print(f"⚠️ LLM routing failed: {str(e)}, defaulting to catalog_service")
+                    except Exception:
                         tool_to_use = "catalog_service"
                     
                     # Map tool name to agent proxy
@@ -297,18 +293,13 @@ Respond with ONLY the agent name (e.g., "catalog_service"). Do not include any e
                         selected_tool = available_tools[tool_to_use]
                         subagent_used = tool_to_use
                     else:
-                        print(f"⚠️ Invalid tool '{tool_to_use}', defaulting to catalog_service")
                         selected_tool = available_tools["catalog_service"]
                         subagent_used = "catalog_service"
-                    
-                    print(f"🎯 Using tool: {subagent_used}")
                     
                     # Call the sub-agent via HTTP
                     try:
                         # Use the same URLs from A2A_AGENTS configuration
                         subagent_url = A2A_AGENTS[subagent_used]["url"]
-                        
-                        print(f"🌐 Calling {subagent_used} at {subagent_url}")
                         
                         # Make HTTP request to sub-agent
                         response = requests.post(
@@ -320,7 +311,6 @@ Respond with ONLY the agent name (e.g., "catalog_service"). Do not include any e
                         
                         if response.status_code == 200:
                             subagent_data = response.json()
-                            print(f"✅ Subagent response: {subagent_data}")
                             
                             # Format the response in a user-friendly way
                             raw_response = subagent_data.get('response', 'No response from subagent')
@@ -339,11 +329,9 @@ Respond with ONLY the agent name (e.g., "catalog_service"). Do not include any e
                             else:
                                 tool_response = raw_response
                         else:
-                            print(f"❌ Subagent HTTP error: {response.status_code}")
                             tool_response = f"Error calling {subagent_used}: HTTP {response.status_code}"
                             
                     except Exception as e:
-                        print(f"❌ Error calling subagent: {str(e)}")
                         # Provide a user-friendly fallback response when sub-agent is unavailable
                         if "Connection" in str(e) or "refused" in str(e):
                             tool_response = get_fallback_response(subagent_used, user_message)
@@ -367,7 +355,6 @@ Respond with ONLY the agent name (e.g., "catalog_service"). Do not include any e
                     return result
                     
                 except Exception as e:
-                    print(f"❌ Error in coordinator: {str(e)}")
                     return {
                         "response": f"I received your message: '{user_message}'. Let me help you with that!",
                         "agent": "online_boutique_coordinator",

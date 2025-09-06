@@ -8,8 +8,6 @@ app = Flask(__name__)
 def get_customer_support(inquiry: str) -> dict:
     """Get customer support response from MCP server."""
     try:
-        print(f"Customer Service: Calling MCP server for inquiry: {inquiry}")
-        
         # Use service name in Kubernetes, fallback to localhost for local dev
         mcp_url = os.environ.get('MCP_SERVER_URL', 'http://localhost:3002')
         if not mcp_url.startswith('http'):
@@ -44,8 +42,6 @@ def chat():
         data = request.get_json()
         message = data.get('message', '')
         
-        print(f"Customer Service A2A received: {message}")
-        
         if not message:
             return jsonify({"error": "No message provided"}), 400
         
@@ -58,7 +54,6 @@ def chat():
         })
         
     except Exception as e:
-        print(f"Error in Customer Service A2A: {str(e)}")
         return jsonify({"error": str(e), "status": "error"}), 500
 
 @app.route('/health', methods=['GET'])

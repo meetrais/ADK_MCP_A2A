@@ -23,8 +23,6 @@ def get_shipping_info(query_type: str) -> dict:
         dict: Shipping information results
     """
     try:
-        print(f"Processing shipping query: {query_type}")  # Debug log
-        
         # Handle different types of shipping queries
         shipping_data = {}
         
@@ -120,7 +118,6 @@ def get_shipping_info(query_type: str) -> dict:
         return shipping_data
         
     except Exception as e:
-        print(f"Error processing shipping query: {str(e)}")  # Debug log
         return {
             'status': 'error',
             'message': f'Error processing shipping request: {str(e)}'
@@ -166,15 +163,11 @@ def chat():
         data = request.get_json()
         message = data.get('message', '')
         
-        print(f"A2A received message: {message}")  # Debug log
-        
         if not message:
             return jsonify({"error": "No message provided"}), 400
         
         # Directly call the tool function to bypass the complex runner
         response_text = get_shipping_info(query_type=message)
-        
-        print(f"A2A direct tool response: {response_text}")
         
         return jsonify({
             "response": response_text,
@@ -183,7 +176,6 @@ def chat():
         })
         
     except Exception as e:
-        print(f"Error in A2A chat endpoint: {str(e)}")  # Debug logging
         return jsonify({
             "error": str(e),
             "status": "error"

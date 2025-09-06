@@ -316,23 +316,16 @@ def get_dummy_catalog_service(query):
 @app.route('/products', methods=['POST'])
 def get_products():
     """MCP endpoint for product catalog"""
-    print(f"MCP Server: Received products request")  # Debug log
-    
     data = request.get_json()
-    print(f"MCP Server: Request data: {data}")  # Debug log
     
     if not data or 'category' not in data:
-        print("MCP Server: Error - No category provided")  # Debug log
         return jsonify({
             'status': 'error',
             'message': 'Product category is required'
         }), 400
     
     category = data['category']
-    print(f"MCP Server: Getting products for category: {category}")  # Debug log
-    
     products = get_dummy_products(category)
-    print(f"MCP Server: Generated products: {len(products)} items")  # Debug log
     
     response = {
         'status': 'success',
@@ -343,16 +336,12 @@ def get_products():
         }
     }
     
-    print(f"MCP Server: Sending products response")  # Debug log
     return jsonify(response)
 
 @app.route('/customer-support', methods=['POST'])
 def customer_support():
     """MCP endpoint for customer support"""
-    print(f"MCP Server: Received customer support request")  # Debug log
-    
     data = request.get_json()
-    print(f"MCP Server: Request data: {data}")  # Debug log
     
     if not data or 'inquiry' not in data:
         return jsonify({
@@ -373,8 +362,6 @@ def customer_support():
 @app.route('/payment-process', methods=['POST'])
 def payment_process():
     """MCP endpoint for payment processing"""
-    print(f"MCP Server: Received payment processing request")  # Debug log
-    
     data = request.get_json()
     
     if not data or 'cart_data' not in data:
@@ -396,8 +383,6 @@ def payment_process():
 @app.route('/shipping-coordinate', methods=['POST'])
 def shipping_coordinate():
     """MCP endpoint for shipping coordination"""
-    print(f"MCP Server: Received shipping coordination request")  # Debug log
-    
     data = request.get_json()
     
     if not data or 'order_data' not in data:
@@ -419,8 +404,6 @@ def shipping_coordinate():
 @app.route('/marketing-recommendations', methods=['POST'])
 def marketing_recommendations():
     """MCP endpoint for marketing recommendations"""
-    print(f"MCP Server: Received marketing recommendations request")  # Debug log
-    
     data = request.get_json()
     
     if not data or 'customer_data' not in data:
@@ -442,10 +425,7 @@ def marketing_recommendations():
 @app.route('/catalog-service', methods=['POST'])
 def catalog_service():
     """MCP endpoint for catalog service"""
-    print(f"MCP Server: Received catalog service request")  # Debug log
-    
     data = request.get_json()
-    print(f"MCP Server: Request data: {data}")  # Debug log
     
     if not data or 'query' not in data:
         return jsonify({
