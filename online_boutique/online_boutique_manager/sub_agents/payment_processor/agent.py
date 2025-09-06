@@ -32,9 +32,15 @@ def process_payment(cart_data: str) -> dict:
             except json.JSONDecodeError:
                 cart_data = {"items": [], "payment_method": "Credit Card"}
         
+        # Get MCP server URL from environment variable, fallback to localhost for local dev
+        mcp_server_url = os.environ.get('MCP_SERVER_URL', 'http://localhost:3002')
+        payment_url = f"{mcp_server_url}/payment-process"
+        
+        print(f"Calling MCP server at: {payment_url}")  # Debug log
+        
         # Call MCP server
         response = requests.post(
-            'http://localhost:3002/payment-process',
+            payment_url,
             json={'cart_data': cart_data},
             timeout=10
         )

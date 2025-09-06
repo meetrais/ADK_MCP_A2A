@@ -25,9 +25,15 @@ def get_catalog_data(query: str) -> dict:
     try:
         print(f"Calling MCP server for catalog query: {query}")  # Debug log
         
+        # Get MCP server URL from environment variable, fallback to localhost for local dev
+        mcp_server_url = os.environ.get('MCP_SERVER_URL', 'http://localhost:3002')
+        catalog_url = f"{mcp_server_url}/catalog-service"
+        
+        print(f"Calling MCP server at: {catalog_url}")  # Debug log
+        
         # Call MCP server
         response = requests.post(
-            'http://localhost:3002/catalog-service',
+            catalog_url,
             json={'query': query},
             timeout=10
         )
