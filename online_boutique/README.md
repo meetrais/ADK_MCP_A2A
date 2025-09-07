@@ -38,35 +38,75 @@ $env:IMAGE_TAG="v1.0.0"
 
 ### GKE Deployment Steps
 
-1. Install GKE auth plugin:
+#### 1. Install GKE auth plugin
+
+**All Platforms:**
 ```bash
 gcloud components install gke-gcloud-auth-plugin
 ```
 
-2. Set project configuration:
-```bash
+#### 2. Set project configuration
+
+**Windows (PowerShell):**
+```powershell
 gcloud config set project $env:PROJECT_ID
 ```
 
-3. Enable required services:
+**Linux/macOS (Bash):**
 ```bash
+gcloud config set project $PROJECT_ID
+```
+
+#### 3. Enable required services
+
+**Windows (PowerShell):**
+```powershell
 gcloud services enable container.googleapis.com --project=$env:PROJECT_ID
 gcloud services enable containerregistry.googleapis.com --project=$env:PROJECT_ID
 ```
 
-4. Create GKE cluster:
+**Linux/macOS (Bash):**
 ```bash
+gcloud services enable container.googleapis.com --project=$PROJECT_ID
+gcloud services enable containerregistry.googleapis.com --project=$PROJECT_ID
+```
+
+#### 4. Create GKE cluster
+
+**Windows (PowerShell):**
+```powershell
 gcloud container clusters create-auto online-boutique-services --project=$env:PROJECT_ID --region=$env:REGION
 ```
 
-5. Build and push Docker image:
+**Linux/macOS (Bash):**
 ```bash
+gcloud container clusters create-auto online-boutique-services --project=$PROJECT_ID --region=$REGION
+```
+
+#### 5. Build and push Docker image
+
+**Windows (PowerShell):**
+```powershell
 cd online_boutique
 docker build -t gcr.io/gke-hackethon/online-boutique-service:$env:IMAGE_TAG .
 docker push gcr.io/gke-hackethon/online-boutique-service:$env:IMAGE_TAG
 ```
 
-6. Deploy to Kubernetes:
+**Linux/macOS (Bash):**
+```bash
+cd online_boutique
+docker build -t gcr.io/gke-hackethon/online-boutique-service:$IMAGE_TAG .
+docker push gcr.io/gke-hackethon/online-boutique-service:$IMAGE_TAG
+```
+
+#### 6. Deploy to Kubernetes
+
+**Windows (PowerShell):**
 ```powershell
 (Get-Content .\gke-deployment.yaml) -replace '\$\{PROJECT_ID\}', $env:PROJECT_ID -replace '\$\{GOOGLE_API_KEY\}', $env:GOOGLE_API_KEY -replace '\$\{IMAGE_TAG\}', $env:IMAGE_TAG | kubectl apply -f -
+```
+
+**Linux/macOS (Bash):**
+```bash
+envsubst < gke-deployment.yaml | kubectl apply -f -
 ```
