@@ -12,6 +12,8 @@ This is an online boutique application built with a multi-agent architecture usi
   - Catalog Service Agent
 - **MCP Server**: Provides tools and services for the agents
 
+<img width="1205" height="648" alt="image" src="https://github.com/user-attachments/assets/a05511fa-6ce1-48ca-912a-5519b0c2e531" />
+
 ## Deployment
 
 This application is designed to run on Google Kubernetes Engine (GKE) with each component deployed as separate microservices.
