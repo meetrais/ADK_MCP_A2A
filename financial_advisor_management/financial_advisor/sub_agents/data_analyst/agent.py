@@ -1,5 +1,9 @@
 from google.adk import Agent
-from . import prompt
+try:
+    from . import prompt
+except ImportError:
+    # Fallback for when running as standalone module
+    import prompt
 from flask import Flask, request, jsonify
 import json
 import requests
