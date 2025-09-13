@@ -78,7 +78,7 @@ A sophisticated multi-agent financial advisory system built using Model Context 
 
 ### System Architecture
 
-The Financial Advisor Management System is built on a multi-agent architecture where specialized agents collaborate through both the MCP protocol and Agent-to-Agent (A2A) HTTP communication to provide comprehensive financial advisory services.  
+The Financial Advisor Management System is built on a multi-agent architecture where specialized agents collaborate through both the MCP protocol and an enhanced Agent-to-Agent (A2A) protocol implementing JSON-RPC 2.0 standards to provide comprehensive financial advisory services.
 
 <img width="1211" height="653" alt="image" src="https://github.com/user-attachments/assets/9e885142-19bc-4253-8672-3d8b8e9921cc" />
 
@@ -88,8 +88,10 @@ The Financial Advisor Management System is built on a multi-agent architecture w
 **1. Main Financial Advisor Agent (`financial_advisor/agent.py`)**
 - **Role**: Central orchestrator coordinating between specialized sub-agents
 - **Framework**: Built on Google ADK using Gemini 2.5 Flash model
-- **Communication**: Uses A2A proxy agents to communicate with sub-agents via HTTP
-- **Architecture**: Implements `A2AAgentProxy` class for seamless integration with external agents
+- **Communication**: Uses enhanced `EnhancedA2AAgentProxy` with JSON-RPC 2.0 protocol support and fallback to legacy HTTP
+- **Architecture**: Features comprehensive A2A Agent Manager with protocol statistics, health monitoring, and task management
+- **Protocol Features**: JSON-RPC 2.0 requests, agent discovery via `/.well-known/agent.json`, streaming support via SSE
+- **Management Tools**: `create_agent_task`, `get_task_status_info`, and real-time health monitoring
 - **Port Configuration**:
   - Data Analyst: `localhost:8080`
   - Execution Analyst: `localhost:8081`
@@ -113,57 +115,75 @@ The Financial Advisor Management System is built on a multi-agent architecture w
 **1. Data Analyst Agent (`sub_agents/data_analyst/agent.py`)**
 - **Purpose**: Market data collection, processing, and analysis
 - **Port**: `8080`
+- **Framework**: Enhanced A2A Server with full JSON-RPC 2.0 protocol support
 - **Integration**: Communicates with MCP server for market data
-- **Capabilities**:
-  - Stock ticker analysis
-  - Price and volume data processing
-  - Market trend analysis
-  - Trading recommendations
-- **Communication**: Provides A2A endpoints (`/chat`, `/agent-card`, `/health`)
+- **Capabilities**: 8 specialized capabilities including:
+  - Market data analysis and trend identification
+  - Technical indicator calculations (RSI, MACD, Bollinger Bands)
+  - Volume analysis and liquidity assessment
+  - Sector rotation and correlation analysis
+  - Earnings and fundamental data integration
+  - Real-time data streaming and alerts
+- **Protocol Features**: Agent card publishing, JSON-RPC 2.0 methods, task management, artifact generation
+- **Communication**: Full A2A protocol with `/.well-known/agent.json`, `/chat`, `/health`, streaming via SSE
 
 **2. Risk Analyst Agent (`sub_agents/risk_analyst/agent.py`)**
 - **Purpose**: Comprehensive risk assessment and management
 - **Port**: `8083`
+- **Framework**: Enhanced A2A Server with full JSON-RPC 2.0 protocol support
 - **Integration**: Uses MCP server for risk calculations
-- **Capabilities**:
-  - Portfolio risk scoring (1-10 scale)
-  - Value-at-Risk (VaR) calculations
-  - Stress testing scenarios
-  - Diversification analysis
-  - Correlation analysis
-  - Hedging recommendations
-- **Output**: Detailed risk assessment with volatility metrics and hedging suggestions
+- **Capabilities**: 8 specialized capabilities including:
+  - Portfolio risk scoring and VaR calculations
+  - Stress testing and scenario analysis
+  - Diversification and correlation analysis
+  - Risk-adjusted return optimization
+  - Hedging strategy development
+  - Regulatory compliance monitoring
+- **Protocol Features**: Agent card publishing, JSON-RPC 2.0 methods, task management, artifact generation
+- **Output**: Structured risk assessment artifacts with comprehensive markdown reports
 
 **3. Trading Analyst Agent (`sub_agents/trading_analyst/agent.py`)**
 - **Purpose**: Trading strategy development and market analysis
 - **Port**: `8082`
+- **Framework**: Enhanced A2A Server with full JSON-RPC 2.0 protocol support
 - **Integration**: Leverages MCP server for trading analysis
-- **Capabilities**:
-  - Trading strategy generation (Buy & Hold, Momentum, Mean Reversion, etc.)
-  - Entry and exit point identification
-  - Risk-reward ratio calculations
-  - Position sizing recommendations
-  - Multi-timeframe analysis (short, medium, long-term)
+- **Capabilities**: 9 specialized capabilities including:
+  - Advanced trading strategy development (Buy & Hold, Momentum, Mean Reversion, etc.)
+  - Multi-timeframe technical analysis and signal generation
+  - Risk-reward optimization and position sizing
+  - Algorithmic trading strategy backtesting
+  - Market regime detection and strategy adaptation
+  - Options and derivatives strategy development
+- **Protocol Features**: Agent card publishing, JSON-RPC 2.0 methods, task management, artifact generation
+- **Output**: Comprehensive trading strategy artifacts and risk management plans
 
 **4. Execution Analyst Agent (`sub_agents/execution_analyst/agent.py`)**
 - **Purpose**: Trade execution optimization and portfolio management
 - **Port**: `8081`
+- **Framework**: Enhanced A2A Server with full JSON-RPC 2.0 protocol support
 - **Integration**: Uses MCP server for execution analysis
-- **Capabilities**:
-  - Order type recommendations (Market, Limit, Stop-Loss, etc.)
-  - Execution timing optimization
-  - Transaction cost analysis
-  - Broker recommendations
-  - Market impact assessment
+- **Capabilities**: 9 specialized capabilities including:
+  - Advanced order execution strategies and timing optimization
+  - Transaction cost analysis and market impact assessment
+  - Smart order routing and venue selection
+  - Portfolio rebalancing and optimization
+  - Execution performance measurement and analytics
+  - Regulatory compliance and best execution monitoring
+- **Protocol Features**: Agent card publishing, JSON-RPC 2.0 methods, task management, artifact generation
+- **Output**: Detailed execution strategies and comprehensive cost analysis artifacts
 
 ### Key Features
 
-#### Agent-to-Agent Communication (A2A)
-- **HTTP-based Protocol**: Each agent runs as an independent Flask server
-- **RESTful Endpoints**: Standardized `/chat`, `/agent-card`, and `/health` endpoints
-- **Proxy Architecture**: Main coordinator uses `A2AAgentProxy` for seamless communication
-- **Async Support**: Built on ADK's async event system for non-blocking operations
-- **Error Handling**: Comprehensive error handling and timeout management
+#### Enhanced Agent-to-Agent Communication (A2A)
+- **JSON-RPC 2.0 Protocol**: Full implementation of JSON-RPC 2.0 specification for standardized messaging
+- **Agent Discovery**: Automatic agent discovery via `/.well-known/agent.json` endpoint with comprehensive agent cards
+- **Task Management**: Complete task lifecycle management with states (submitted, working, input-required, completed, failed, cancelled)
+- **Message Structure**: Support for multiple message part types (TextPart, FilePart, DataPart) with rich content handling
+- **Artifacts**: Tangible output generation with metadata, versioning, and structured data formats
+- **Streaming Support**: Real-time updates via Server-Sent Events (SSE) for long-running tasks
+- **Protocol Auto-Detection**: Enhanced proxy with automatic protocol detection and fallback to legacy HTTP
+- **Health Monitoring**: Comprehensive health checks with protocol statistics and performance metrics
+- **Standards-Based**: Built on HTTP, JSON-RPC 2.0, and SSE standards for maximum compatibility
 
 #### Financial Analysis Pipeline
 1. **Data Collection**: Data Analyst gathers market information via MCP server
@@ -200,36 +220,42 @@ Based on the system prompts, the workflow follows a methodical approach:
 ```
 financial_advisor_management/
 ├── financial_advisor/
-│   ├── agent.py              # Main coordinator with A2A proxy system
+│   ├── agent.py              # Main coordinator with enhanced A2A proxy system
+│   ├── a2a_protocol.py       # Complete A2A protocol implementation with JSON-RPC 2.0
 │   ├── prompt.py             # System prompts and workflow instructions
 │   ├── simple-mcp-server/    # MCP server implementation
 │   │   └── mcp_server.py     # Flask server with financial analysis tools
 │   ├── sub_agents/           # Specialized financial agents
 │   │   ├── data_analyst/     # Market data analysis (port 8080)
-│   │   │   ├── agent.py      # A2A-enabled data analysis agent
+│   │   │   ├── agent.py      # Enhanced A2A server with JSON-RPC 2.0 support
 │   │   │   └── prompt.py     # Data analyst instructions
 │   │   ├── execution_analyst/ # Trade execution (port 8081)
-│   │   │   ├── agent.py      # A2A-enabled execution agent
+│   │   │   ├── agent.py      # Enhanced A2A server with JSON-RPC 2.0 support
 │   │   │   └── prompt.py     # Execution analyst instructions
 │   │   ├── risk_analyst/     # Risk assessment (port 8083)
-│   │   │   ├── agent.py      # A2A-enabled risk analysis agent
+│   │   │   ├── agent.py      # Enhanced A2A server with JSON-RPC 2.0 support
 │   │   │   └── prompt.py     # Risk analyst instructions
 │   │   └── trading_analyst/  # Trading strategies (port 8082)
-│   │       ├── agent.py      # A2A-enabled trading agent
+│   │       ├── agent.py      # Enhanced A2A server with JSON-RPC 2.0 support
 │   │       └── prompt.py     # Trading analyst instructions
 │   └── tools/                # Shared utilities (currently empty)
 ├── pyproject.toml           # Poetry configuration with ADK dependencies
 └── README.md               # This documentation
 ```
 
-### Agent Communication Flow
+### Enhanced Agent Communication Flow
 
 1. **User Request**: Client interacts with financial coordinator via ADK web interface
-2. **Agent Orchestration**: Coordinator determines which sub-agents to invoke
-3. **A2A Communication**: HTTP POST requests sent to sub-agent `/chat` endpoints
-4. **MCP Integration**: Sub-agents call MCP server for specialized financial analysis
-5. **Response Assembly**: Results aggregated and formatted by coordinator
-6. **Client Delivery**: Final analysis presented to user in markdown format
+2. **Agent Discovery**: Coordinator discovers available agents via `/.well-known/agent.json` endpoints
+3. **Protocol Detection**: Enhanced proxy automatically detects JSON-RPC 2.0 support with fallback to legacy HTTP
+4. **Task Creation**: Coordinator creates structured A2A tasks with unique IDs and lifecycle management
+5. **JSON-RPC Communication**: Standardized JSON-RPC 2.0 requests sent with method identification and structured parameters
+6. **Agent Processing**: Sub-agents process requests using their specialized capabilities and generate artifacts
+7. **MCP Integration**: Sub-agents call MCP server for specialized financial analysis and data
+8. **Streaming Updates**: Real-time task progress updates via Server-Sent Events (SSE) for long-running operations
+9. **Artifact Generation**: Agents create structured output artifacts with metadata and versioning
+10. **Response Assembly**: Results aggregated with comprehensive error handling and protocol statistics
+11. **Client Delivery**: Final analysis presented to user in structured markdown format with embedded artifacts
 
 ### Dependencies
 
