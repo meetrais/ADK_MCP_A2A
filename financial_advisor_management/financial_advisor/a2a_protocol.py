@@ -1,6 +1,6 @@
 """
 Enhanced Agent-to-Agent (A2A) Protocol Implementation
-Implements full A2A specification including JSON-RPC 2.0, task management, streaming, and discovery
+Proper JSON-RPC 2.0 Implementation following the official specification
 """
 
 import json
@@ -15,6 +15,97 @@ import requests
 from datetime import datetime
 import threading
 import queue
+
+# JSON-RPC 2.0 Error Codes (from specification)
+class JSONRPCErrorCode:
+    PARSE_ERROR = -32700
+    INVALID_REQUEST = -32600
+    METHOD_NOT_FOUND = -32601
+    INVALID_PARAMS = -32602
+    INTERNAL_ERROR = -32603
+    # Server error range: -32000 to -32099
+
+@dataclass
+class JSONRPCError:
+    code: int
+    message: str
+    data: Optional[Any] = None
+    
+    def to_dict(self) -> Dict[str, Any]:
+        result = {"code": self.code, "message": self.message}
+        if self.data is not None:
+            result["data"] = self.data
+        return result
+
+@dataclass
+class JSONRPCRequest:
+    method: str
+    params: Optional[Union[Dict, list]] = None
+    id: Optional[Union[str, int]] = None
+    jsonrpc: str = "2.0"
+    
+    def __post_init__(self):
+        if self.id is None:
+            self.id = str(uuid.uuid4())
+    
+    def to_dict(self) -> Dict[str, Any]:
+        result = {
+            "jsonrpc": self.jsonrpc,
+            "method": self.method,
+            "id": self.id
+        }
+        if self.params is not None:
+            result["params"] = self.params
+        return result
+    
+    def is_notification(self) -> bool:
+        """Check if this is a notification (no response expected)"""
+        return self.id is None
+
+@dataclass
+class JSONRPCResponse:
+    jsonrpc: str = "2.0"
+    id: Optional[Union[str, int]] = None
+    result: Optional[Any] = None
+    error: Optional[JSONRPCError] = None
+    
+    def to_dict(self) -> Dict[str, Any]:
+        response = {
+            "jsonrpc": self.jsonrpc,
+            "id": self.id
+        }
+        
+        if self.error is not None:
+            response["error"] = self.error.to_dict()
+        else:
+            response["result"] = self.result
+            
+        return response
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'JSONRPCResponse':
+        """Create response from dictionary with validation"""
+        if data.get("jsonrpc") != "2.0":
+            raise ValueError("Invalid JSON-RPC version")
+        
+        error_data = data.get("error")
+        error = None
+        if error_data:
+            error = JSONRPCError(
+                code=error_data["code"],
+                message=error_data["message"],
+                data=error_data.get("data")
+            )
+        
+        return cls(
+            jsonrpc=data["jsonrpc"],
+            id=data.get("id"),
+            result=data.get("result"),
+            error=error
+        )
+    
+    def is_error(self) -> bool:
+        return self.error is not None
 
 class TaskState(Enum):
     """Task lifecycle states as per A2A specification"""
@@ -98,47 +189,214 @@ class A2ATask:
         self.artifacts.append(artifact)
         self.updated_at = datetime.utcnow().isoformat()
 
-class JSONRPCRequest:
-    """JSON-RPC 2.0 request implementation"""
+class JSONRPCServer:
+    """JSON-RPC 2.0 Server following official specification"""
+    def __init__(self):
+        self.methods: Dict[str, callable] = {}
     
-    def __init__(self, method: str, params: Any = None, request_id: str = None):
-        self.jsonrpc = "2.0"
-        self.method = method
-        self.params = params
-        self.id = request_id or str(uuid.uuid4())
+    def register_method(self, name: str, method: callable):
+        """Register a method that can be called via JSON-RPC"""
+        self.methods[name] = method
     
-    def to_dict(self) -> Dict[str, Any]:
-        result = {
-            "jsonrpc": self.jsonrpc,
-            "method": self.method,
-            "id": self.id
+    def handle_request(self, request_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Handle incoming JSON-RPC request with proper validation"""
+        
+        # Validate basic structure
+        if not isinstance(request_data, dict):
+            return self._error_response(None, JSONRPCErrorCode.INVALID_REQUEST, "Request must be an object")
+        
+        if request_data.get("jsonrpc") != "2.0":
+            return self._error_response(request_data.get("id"), JSONRPCErrorCode.INVALID_REQUEST, "Invalid JSON-RPC version")
+        
+        method_name = request_data.get("method")
+        if not method_name or not isinstance(method_name, str):
+            return self._error_response(request_data.get("id"), JSONRPCErrorCode.INVALID_REQUEST, "Invalid method")
+        
+        params = request_data.get("params")
+        request_id = request_data.get("id")
+        
+        # Check if it's a notification
+        is_notification = request_id is None
+        
+        # Check if method exists
+        if method_name not in self.methods:
+            if not is_notification:
+                return self._error_response(request_id, JSONRPCErrorCode.METHOD_NOT_FOUND, f"Method '{method_name}' not found")
+            return None
+        
+        # Call method
+        try:
+            method = self.methods[method_name]
+            
+            # Call with or without params
+            if params is None:
+                result = method()
+            elif isinstance(params, list):
+                result = method(*params)
+            elif isinstance(params, dict):
+                result = method(**params)
+            else:
+                if not is_notification:
+                    return self._error_response(request_id, JSONRPCErrorCode.INVALID_PARAMS, "Invalid params type")
+                return None
+            
+            # Return result (or nothing for notifications)
+            if not is_notification:
+                return {
+                    "jsonrpc": "2.0",
+                    "result": result,
+                    "id": request_id
+                }
+            
+            return None
+            
+        except TypeError as e:
+            if not is_notification:
+                return self._error_response(request_id, JSONRPCErrorCode.INVALID_PARAMS, f"Invalid parameters: {str(e)}")
+            return None
+        except Exception as e:
+            if not is_notification:
+                return self._error_response(request_id, JSONRPCErrorCode.INTERNAL_ERROR, f"Method execution error: {str(e)}")
+            return None
+    
+    def _error_response(self, request_id: Optional[Union[str, int]], code: int, message: str, data: Any = None) -> Dict[str, Any]:
+        """Create properly formatted error response"""
+        error = {"code": code, "message": message}
+        if data is not None:
+            error["data"] = data
+        
+        return {
+            "jsonrpc": "2.0",
+            "error": error,
+            "id": request_id
         }
-        if self.params is not None:
-            result["params"] = self.params
-        return result
 
-class JSONRPCResponse:
-    """JSON-RPC 2.0 response implementation"""
+class JSONRPCClient:
+    """Proper JSON-RPC 2.0 Client with full validation"""
+    def __init__(self, base_url: str, timeout: int = 30):
+        self.base_url = base_url.rstrip('/')
+        self.timeout = timeout
+        self.session = requests.Session()
     
-    def __init__(self, result: Any = None, error: Dict[str, Any] = None, request_id: str = None):
-        self.jsonrpc = "2.0"
-        self.id = request_id
-        self.result = result
-        self.error = error
+    def send_request(self, method: str, params: Any = None, 
+                    request_id: Optional[Union[str, int]] = None) -> JSONRPCResponse:
+        """Send JSON-RPC 2.0 request with proper validation"""
+        
+        # Create request
+        request = JSONRPCRequest(method=method, params=params, id=request_id)
+        
+        try:
+            # Send HTTP request
+            http_response = self.session.post(
+                f"{self.base_url}/rpc",
+                json=request.to_dict(),
+                headers={
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
+                },
+                timeout=self.timeout
+            )
+            
+            # Handle HTTP-level errors
+            if http_response.status_code != 200:
+                return self._create_error_response(
+                    request.id,
+                    JSONRPCErrorCode.INTERNAL_ERROR,
+                    f"HTTP {http_response.status_code}: {http_response.reason}",
+                    {"http_status": http_response.status_code, "http_body": http_response.text}
+                )
+            
+            # Validate Content-Type
+            content_type = http_response.headers.get('content-type', '')
+            if 'application/json' not in content_type:
+                return self._create_error_response(
+                    request.id,
+                    JSONRPCErrorCode.INTERNAL_ERROR,
+                    "Invalid content type",
+                    {"content_type": content_type}
+                )
+            
+            # Parse JSON response
+            try:
+                response_data = http_response.json()
+            except json.JSONDecodeError as e:
+                return self._create_error_response(
+                    request.id,
+                    JSONRPCErrorCode.PARSE_ERROR,
+                    "Invalid JSON response",
+                    {"parse_error": str(e)}
+                )
+            
+            # Validate and create JSON-RPC response
+            try:
+                response = JSONRPCResponse.from_dict(response_data)
+                
+                # Validate ID matches (unless it's an error response to invalid request)
+                if response.id != request.id and response_data.get("error", {}).get("code") != JSONRPCErrorCode.INVALID_REQUEST:
+                    return self._create_error_response(
+                        request.id,
+                        JSONRPCErrorCode.INTERNAL_ERROR,
+                        "Response ID mismatch",
+                        {"expected_id": request.id, "received_id": response.id}
+                    )
+                
+                return response
+                
+            except (ValueError, KeyError) as e:
+                return self._create_error_response(
+                    request.id,
+                    JSONRPCErrorCode.INVALID_REQUEST,
+                    "Invalid JSON-RPC response format",
+                    {"validation_error": str(e)}
+                )
+                
+        except requests.exceptions.Timeout:
+            return self._create_error_response(
+                request.id,
+                JSONRPCErrorCode.INTERNAL_ERROR,
+                "Request timeout",
+                {"timeout": self.timeout}
+            )
+        except requests.exceptions.ConnectionError as e:
+            return self._create_error_response(
+                request.id,
+                JSONRPCErrorCode.INTERNAL_ERROR,
+                "Connection error",
+                {"connection_error": str(e)}
+            )
+        except Exception as e:
+            return self._create_error_response(
+                request.id,
+                JSONRPCErrorCode.INTERNAL_ERROR,
+                "Unexpected error",
+                {"exception": str(e), "type": type(e).__name__}
+            )
     
-    def to_dict(self) -> Dict[str, Any]:
-        response = {
-            "jsonrpc": self.jsonrpc,
-            "id": self.id
-        }
-        if self.error:
-            response["error"] = self.error
-        else:
-            response["result"] = self.result
-        return response
+    def send_notification(self, method: str, params: Any = None) -> bool:
+        """Send notification (no response expected)"""
+        request = JSONRPCRequest(method=method, params=params, id=None)
+        
+        try:
+            http_response = self.session.post(
+                f"{self.base_url}/rpc",
+                json=request.to_dict(),
+                headers={"Content-Type": "application/json"},
+                timeout=self.timeout
+            )
+            return http_response.status_code == 200
+        except:
+            return False
+    
+    def _create_error_response(self, request_id: Optional[Union[str, int]], 
+                             code: int, message: str, data: Any = None) -> JSONRPCResponse:
+        """Create properly formatted error response"""
+        return JSONRPCResponse(
+            id=request_id,
+            error=JSONRPCError(code=code, message=message, data=data)
+        )
 
 class A2AServer:
-    """Enhanced A2A Server with full protocol support"""
+    """Enhanced A2A Server with proper JSON-RPC 2.0 support"""
     
     def __init__(self, agent_name: str, description: str, capabilities: List[str], 
                  model: str = "gemini-2.5-flash", version: str = "1.0"):
@@ -149,10 +407,19 @@ class A2AServer:
         self.version = version
         self.tasks: Dict[str, A2ATask] = {}
         self.app = Flask(__name__)
+        self.rpc_server = JSONRPCServer()
         self.setup_routes()
+        self.setup_rpc_methods()
         
         # Streaming support
         self.stream_queues: Dict[str, queue.Queue] = {}
+        
+    def setup_rpc_methods(self):
+        """Setup JSON-RPC 2.0 methods"""
+        self.rpc_server.register_method("message.send", self._rpc_message_send)
+        self.rpc_server.register_method("tasks.get", self._rpc_tasks_get)
+        self.rpc_server.register_method("tasks.create", self._rpc_tasks_create)
+        self.rpc_server.register_method("artifacts.get", self._rpc_artifacts_get)
         
     def setup_routes(self):
         """Setup Flask routes for A2A protocol endpoints"""
@@ -191,44 +458,59 @@ class A2AServer:
         
         @self.app.route('/rpc', methods=['POST'])
         def handle_rpc():
-            """Main JSON-RPC 2.0 endpoint"""
+            """Main JSON-RPC 2.0 endpoint with proper validation"""
             try:
                 data = request.get_json()
-                if not data or data.get("jsonrpc") != "2.0":
-                    return jsonify(JSONRPCResponse(
-                        error={"code": -32600, "message": "Invalid Request"},
-                        request_id=data.get("id") if data else None
-                    ).to_dict()), 400
+                if not data:
+                    return jsonify({
+                        "jsonrpc": "2.0",
+                        "error": {
+                            "code": JSONRPCErrorCode.PARSE_ERROR,
+                            "message": "Invalid JSON"
+                        },
+                        "id": None
+                    }), 400
                 
-                method = data.get("method")
-                params = data.get("params", {})
-                request_id = data.get("id")
-                
-                if method == "message.send":
-                    return self._handle_message_send(params, request_id)
-                elif method == "tasks.get":
-                    return self._handle_tasks_get(params, request_id)
-                elif method == "tasks.create":
-                    return self._handle_tasks_create(params, request_id)
-                elif method == "artifacts.get":
-                    return self._handle_artifacts_get(params, request_id)
+                response = self.rpc_server.handle_request(data)
+                if response:
+                    # Determine HTTP status code based on error
+                    if "error" in response:
+                        error_code = response["error"]["code"]
+                        if error_code == JSONRPCErrorCode.METHOD_NOT_FOUND:
+                            return jsonify(response), 404
+                        elif error_code in [JSONRPCErrorCode.INVALID_REQUEST, JSONRPCErrorCode.INVALID_PARAMS]:
+                            return jsonify(response), 400
+                        else:
+                            return jsonify(response), 500
+                    return jsonify(response)
                 else:
-                    return jsonify(JSONRPCResponse(
-                        error={"code": -32601, "message": "Method not found"},
-                        request_id=request_id
-                    ).to_dict()), 404
+                    # Notification - no response
+                    return "", 200
                     
+            except json.JSONDecodeError:
+                return jsonify({
+                    "jsonrpc": "2.0",
+                    "error": {
+                        "code": JSONRPCErrorCode.PARSE_ERROR,
+                        "message": "Invalid JSON"
+                    },
+                    "id": None
+                }), 400
             except Exception as e:
-                return jsonify(JSONRPCResponse(
-                    error={"code": -32603, "message": f"Internal error: {str(e)}"},
-                    request_id=data.get("id") if data else None
-                ).to_dict()), 500
+                return jsonify({
+                    "jsonrpc": "2.0",
+                    "error": {
+                        "code": JSONRPCErrorCode.INTERNAL_ERROR,
+                        "message": f"Internal server error: {str(e)}"
+                    },
+                    "id": data.get("id") if data else None
+                }), 500
         
         @self.app.route('/message/send', methods=['POST'])
         def message_send():
             """Direct message sending endpoint"""
             data = request.get_json()
-            return self._handle_message_send(data, str(uuid.uuid4()))
+            return self._handle_message_send(data.get("message", ""))
         
         @self.app.route('/message/stream', methods=['POST'])
         def message_stream():
@@ -348,13 +630,74 @@ class A2AServer:
         def legacy_chat():
             """Legacy chat endpoint"""
             data = request.get_json()
-            return self._handle_message_send(data, str(uuid.uuid4()))
+            return self._handle_message_send(data.get("message", ""))
     
-    def _handle_message_send(self, params: Dict[str, Any], request_id: str):
-        """Handle message.send JSON-RPC method"""
-        try:
-            message_content = params.get("message", "")
+    def _rpc_message_send(self, message: str = "") -> Dict[str, Any]:
+        """JSON-RPC method: message.send"""
+        return self._handle_message_send(message)
+    
+    def _rpc_tasks_get(self, task_id: str = None) -> Dict[str, Any]:
+        """JSON-RPC method: tasks.get"""
+        if task_id:
+            if task_id not in self.tasks:
+                raise ValueError("Task not found")
             
+            task = self.tasks[task_id]
+            return {
+                "task_id": task_id,
+                "state": task.state.value,
+                "progress": task.progress,
+                "created_at": task.created_at,
+                "updated_at": task.updated_at,
+                "message": task.message.to_dict(),
+                "response": task.response.to_dict() if task.response else None,
+                "artifacts": [asdict(artifact) for artifact in task.artifacts]
+            }
+        else:
+            return {
+                "tasks": [
+                    {
+                        "task_id": tid,
+                        "state": task.state.value,
+                        "progress": task.progress,
+                        "created_at": task.created_at,
+                        "updated_at": task.updated_at
+                    }
+                    for tid, task in self.tasks.items()
+                ]
+            }
+    
+    def _rpc_tasks_create(self, message: str = "") -> Dict[str, Any]:
+        """JSON-RPC method: tasks.create"""
+        message_obj = A2AMessage(
+            parts=[MessagePart(PartType.TEXT, message)],
+            timestamp=datetime.utcnow().isoformat(),
+            message_id=str(uuid.uuid4())
+        )
+        
+        task_id = str(uuid.uuid4())
+        task = A2ATask(
+            task_id=task_id,
+            state=TaskState.SUBMITTED,
+            message=message_obj
+        )
+        
+        self.tasks[task_id] = task
+        
+        return {"task_id": task_id, "state": "submitted"}
+    
+    def _rpc_artifacts_get(self, artifact_id: str) -> Dict[str, Any]:
+        """JSON-RPC method: artifacts.get"""
+        for task in self.tasks.values():
+            for artifact in task.artifacts:
+                if artifact.artifact_id == artifact_id:
+                    return asdict(artifact)
+        
+        raise ValueError("Artifact not found")
+    
+    def _handle_message_send(self, message_content: str) -> Dict[str, Any]:
+        """Handle message sending with proper A2A protocol"""
+        try:
             # Create A2A message
             message = A2AMessage(
                 parts=[MessagePart(PartType.TEXT, message_content)],
@@ -387,104 +730,19 @@ class A2AServer:
             task.update_state(TaskState.COMPLETED)
             task.progress = 1.0
             
-            return jsonify(JSONRPCResponse(
-                result={
-                    "task_id": task_id,
-                    "response": result,
-                    "agent": self.agent_name,
-                    "status": "success"
-                },
-                request_id=request_id
-            ).to_dict())
+            return {
+                "task_id": task_id,
+                "response": result,
+                "agent": self.agent_name,
+                "status": "success"
+            }
             
         except Exception as e:
-            return jsonify(JSONRPCResponse(
-                error={"code": -32603, "message": f"Processing error: {str(e)}"},
-                request_id=request_id
-            ).to_dict()), 500
-    
-    def _handle_tasks_get(self, params: Dict[str, Any], request_id: str):
-        """Handle tasks.get JSON-RPC method"""
-        task_id = params.get("task_id")
-        
-        if task_id:
-            if task_id not in self.tasks:
-                return jsonify(JSONRPCResponse(
-                    error={"code": -32602, "message": "Task not found"},
-                    request_id=request_id
-                ).to_dict()), 404
-            
-            task = self.tasks[task_id]
-            return jsonify(JSONRPCResponse(
-                result={
-                    "task_id": task_id,
-                    "state": task.state.value,
-                    "progress": task.progress,
-                    "created_at": task.created_at,
-                    "updated_at": task.updated_at,
-                    "message": task.message.to_dict(),
-                    "response": task.response.to_dict() if task.response else None,
-                    "artifacts": [asdict(artifact) for artifact in task.artifacts]
-                },
-                request_id=request_id
-            ).to_dict())
-        else:
-            return jsonify(JSONRPCResponse(
-                result={
-                    "tasks": [
-                        {
-                            "task_id": tid,
-                            "state": task.state.value,
-                            "progress": task.progress,
-                            "created_at": task.created_at,
-                            "updated_at": task.updated_at
-                        }
-                        for tid, task in self.tasks.items()
-                    ]
-                },
-                request_id=request_id
-            ).to_dict())
-    
-    def _handle_tasks_create(self, params: Dict[str, Any], request_id: str):
-        """Handle tasks.create JSON-RPC method"""
-        message_content = params.get("message", "")
-        
-        message = A2AMessage(
-            parts=[MessagePart(PartType.TEXT, message_content)],
-            timestamp=datetime.utcnow().isoformat(),
-            message_id=str(uuid.uuid4())
-        )
-        
-        task_id = str(uuid.uuid4())
-        task = A2ATask(
-            task_id=task_id,
-            state=TaskState.SUBMITTED,
-            message=message
-        )
-        
-        self.tasks[task_id] = task
-        
-        return jsonify(JSONRPCResponse(
-            result={"task_id": task_id, "state": "submitted"},
-            request_id=request_id
-        ).to_dict())
-    
-    def _handle_artifacts_get(self, params: Dict[str, Any], request_id: str):
-        """Handle artifacts.get JSON-RPC method"""
-        artifact_id = params.get("artifact_id")
-        
-        for task in self.tasks.values():
-            for artifact in task.artifacts:
-                if artifact.artifact_id == artifact_id:
-                    return jsonify(JSONRPCResponse(
-                        result=asdict(artifact),
-                        request_id=request_id
-                    ).to_dict())
-        
-        return jsonify(JSONRPCResponse(
-            error={"code": -32602, "message": "Artifact not found"},
-            request_id=request_id
-        ).to_dict()), 404
+            return {
+                "error": str(e),
+                "agent": self.agent_name,
+                "status": "error"
+            }
     
     def _process_message(self, message: str) -> str:
         """Override this method in subclasses to implement actual message processing"""
@@ -501,10 +759,11 @@ class A2AServer:
         self.app.run(host=host, port=port, debug=debug)
 
 class A2AClient:
-    """Enhanced A2A Client with full protocol support"""
+    """Enhanced A2A Client with proper JSON-RPC 2.0 support"""
     
     def __init__(self, base_url: str):
         self.base_url = base_url.rstrip('/')
+        self.json_rpc_client = JSONRPCClient(base_url)
         
     def discover_agent(self) -> Dict[str, Any]:
         """Discover agent capabilities via well-known URI"""
@@ -523,51 +782,27 @@ class A2AClient:
         
         return {"name": "unknown", "status": "unavailable"}
     
-    def send_rpc_request(self, method: str, params: Any = None) -> Dict[str, Any]:
-        """Send JSON-RPC 2.0 request"""
-        rpc_request = JSONRPCRequest(method, params)
-        
-        try:
-            response = requests.post(
-                f"{self.base_url}/rpc",
-                json=rpc_request.to_dict(),
-                headers={"Content-Type": "application/json"},
-                timeout=30
-            )
-            
-            if response.status_code == 200:
-                return response.json()
-            else:
-                return {
-                    "jsonrpc": "2.0",
-                    "error": {"code": response.status_code, "message": response.text},
-                    "id": rpc_request.id
-                }
-                
-        except Exception as e:
-            return {
-                "jsonrpc": "2.0",
-                "error": {"code": -32603, "message": str(e)},
-                "id": rpc_request.id
-            }
+    def send_rpc_request(self, method: str, params: Any = None) -> JSONRPCResponse:
+        """Send JSON-RPC 2.0 request with proper validation"""
+        return self.json_rpc_client.send_request(method, params)
     
-    def send_message(self, message: str) -> Dict[str, Any]:
+    def send_message(self, message: str) -> JSONRPCResponse:
         """Send message using message.send method"""
         return self.send_rpc_request("message.send", {"message": message})
     
-    def create_task(self, message: str) -> Dict[str, Any]:
+    def create_task(self, message: str) -> JSONRPCResponse:
         """Create task using tasks.create method"""
         return self.send_rpc_request("tasks.create", {"message": message})
     
-    def get_task_status(self, task_id: str) -> Dict[str, Any]:
+    def get_task_status(self, task_id: str) -> JSONRPCResponse:
         """Get task status"""
         return self.send_rpc_request("tasks.get", {"task_id": task_id})
     
-    def get_all_tasks(self) -> Dict[str, Any]:
+    def get_all_tasks(self) -> JSONRPCResponse:
         """Get all tasks"""
         return self.send_rpc_request("tasks.get")
     
-    def get_artifact(self, artifact_id: str) -> Dict[str, Any]:
+    def get_artifact(self, artifact_id: str) -> JSONRPCResponse:
         """Get artifact"""
         return self.send_rpc_request("artifacts.get", {"artifact_id": artifact_id})
     
