@@ -1,12 +1,18 @@
 from google.adk import Agent
 try:
     from . import prompt
+    from ...a2a_protocol import A2AServer, TaskArtifact
 except ImportError:
     # Fallback for when running as standalone module
     import prompt
-from flask import Flask, request, jsonify
+    import sys
+    import os
+    sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+    from a2a_protocol import A2AServer, TaskArtifact
+
 import json
 import requests
+import uuid
 
 MODEL = "gemini-2.5-flash"
 
@@ -72,73 +78,124 @@ data_analyst_agent = Agent(
     tools=[get_market_analysis],  # Using MCP function instead of google_search
 )
 
-# Flask app for A2A protocol
-app = Flask(__name__)
+class DataAnalystA2AServer(A2AServer):
+    """Enhanced Data Analyst A2A Server with full protocol support"""
+    
+    def __init__(self):
+        super().__init__(
+            agent_name="data_analyst_agent",
+            description="Data analyst agent that provides comprehensive market data analysis using MCP server",
+            capabilities=[
+                "market_analysis", 
+                "financial_data",
+                "price_analysis",
+                "volume_analysis", 
+                "technical_indicators",
+                "market_trends",
+                "ticker_analysis",
+                "mcp_integration"
+            ],
+            model=MODEL,
+            version="2.0"
+        )
+    
+    def _process_message(self, message: str) -> str:
+        """Process market data analysis message and return structured result"""
+        try:
+            print(f"📊 Processing market data analysis for: {message[:100]}...")
+            
+            # Get market data from MCP server
+            market_result = get_market_analysis(ticker=message)
+            
+            if market_result.get('status') == 'success':
+                # Create artifacts for different data components
+                artifacts = []
+                
+                # Market data artifact
+                market_data = TaskArtifact(
+                    artifact_id=str(uuid.uuid4()),
+                    name="market_data",
+                    type="json",
+                    content={
+                        "ticker": market_result.get('ticker'),
+                        "price": market_result.get('price'),
+                        "change": market_result.get('change'),
+                        "change_percent": market_result.get('change_percent'),
+                        "volume": market_result.get('volume'),
+                        "market_cap": market_result.get('market_cap')
+                    },
+                    metadata={"component": "market_data", "generated_by": "mcp_server"}
+                )
+                artifacts.append(market_data)
+                
+                # Analysis artifact
+                analysis_data = TaskArtifact(
+                    artifact_id=str(uuid.uuid4()),
+                    name="market_analysis",
+                    type="json",
+                    content={
+                        "analysis": market_result.get('analysis'),
+                        "recommendation": market_result.get('recommendation'),
+                        "risk_level": market_result.get('risk_level')
+                    },
+                    metadata={"component": "analysis", "generated_by": "mcp_server"}
+                )
+                artifacts.append(analysis_data)
+                
+                # Format comprehensive response
+                response = f"""
+# 📊 Market Data Analysis Report
 
-# Agent card - updated to reflect MCP capabilities
-AGENT_CARD = {
-    "name": "data_analyst_agent",
-    "description": "Data analyst agent that provides market analysis using MCP server",
-    "version": "1.0",
-    "capabilities": ["market_analysis", "mcp_integration", "financial_data"],
-    "model": MODEL,
-    "endpoints": {
-        "chat": "/chat",
-        "card": "/agent-card"
-    },
-    "input_format": "text",
-    "output_format": "json",
-    "data_source": "MCP Server"
-}
+## Symbol: {market_result.get('ticker', 'N/A')}
 
-@app.route('/agent-card', methods=['GET'])
-def get_agent_card():
-    """Return the agent card describing capabilities"""
-    return jsonify(AGENT_CARD)
+### Current Market Data
+- **Price**: {market_result.get('price', 'N/A')}
+- **Change**: {market_result.get('change', 'N/A')}
+- **Change %**: {market_result.get('change_percent', 'N/A')}%
+- **Volume**: {market_result.get('volume', 'N/A'):,}
+- **Market Cap**: {market_result.get('market_cap', 'N/A')}
 
-@app.route('/chat', methods=['POST'])
-def chat():
-    """Main endpoint for A2A communication"""
-    try:
-        data = request.get_json()
-        message = data.get('message', '')
-        
-        print(f"A2A received message: {message}")  # Debug log
-        
-        if not message:
-            return jsonify({"error": "No message provided"}), 400
-        
-        # Directly call the tool function to bypass the complex runner
-        # and avoid the LLM's final response generation.
-        response_text = get_market_analysis(ticker=message)
-        
-        print(f"A2A direct tool response: {response_text}")
-        
-        return jsonify({
-            "response": response_text,
-            "agent": "data_analyst_agent",
-            "status": "success"
-        })
-        
-    except Exception as e:
-        print(f"Error in A2A chat endpoint: {str(e)}")  # Debug logging
-        return jsonify({
-            "error": str(e),
-            "status": "error"
-        }), 500
+### Analysis
+{market_result.get('analysis', 'No analysis available')}
 
-@app.route('/health', methods=['GET'])
-def health_check():
-    """Health check endpoint"""
-    return jsonify({"status": "healthy", "agent": "data_analyst_agent"})
+### Recommendation
+**{market_result.get('recommendation', 'No recommendation available')}**
+
+### Risk Level
+**{market_result.get('risk_level', 'Unknown')}**
+
+---
+*Analysis powered by MCP Market Data Server*
+                """.strip()
+                
+                print(f"✅ Market data analysis completed successfully")
+                return response
+                
+            else:
+                error_msg = market_result.get('message', 'Unknown error occurred')
+                print(f"❌ Market data analysis failed: {error_msg}")
+                return f"🚨 **Market Data Error**: {error_msg}"
+                
+        except Exception as e:
+            error_msg = f"Error processing market data analysis: {str(e)}"
+            print(f"❌ {error_msg}")
+            return f"🚨 **Processing Error**: {error_msg}"
+
+# Create enhanced A2A server instance
+a2a_server = DataAnalystA2AServer()
 
 def run_server(host='localhost', port=8080, debug=False):
-    """Start the A2A agent server"""
-    print(f"Starting A2A Data Analyst Agent on http://{host}:{port}")
-    print(f"Agent card available at: http://{host}:{port}/agent-card")
-    print(f"Chat endpoint available at: http://{host}:{port}/chat")
-    print(f"MCP Server should be running on http://localhost:3001")
-    app.run(host=host, port=port, debug=debug)
+    """Start the enhanced A2A Data Analyst server"""
+    print(f"🚀 Starting Enhanced A2A Data Analyst Agent on http://{host}:{port}")
+    print(f"📋 Agent Card: http://{host}:{port}/.well-known/agent.json")
+    print(f"🔌 JSON-RPC Endpoint: http://{host}:{port}/rpc")
+    print(f"💬 Message Endpoint: http://{host}:{port}/message/send")
+    print(f"📡 Streaming Endpoint: http://{host}:{port}/message/stream")
+    print(f"🏥 Health Check: http://{host}:{port}/health")
+    print(f"🔧 MCP Server should be running on http://localhost:3001")
+    print(f"📊 Capabilities: {', '.join(a2a_server.capabilities)}")
+    
+    a2a_server.run_server(host=host, port=port, debug=debug)
 
 if __name__ == "__main__":
     run_server()

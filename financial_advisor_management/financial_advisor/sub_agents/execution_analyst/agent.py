@@ -1,12 +1,18 @@
 from google.adk.agents import LlmAgent
 try:
     from . import prompt
+    from ...a2a_protocol import A2AServer, TaskArtifact
 except ImportError:
     # Fallback for when running as standalone module
     import prompt
-from flask import Flask, request, jsonify
+    import sys
+    import os
+    sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+    from a2a_protocol import A2AServer, TaskArtifact
+
 import json
 import requests
+import uuid
 
 MODEL = "gemini-2.5-flash"
 
@@ -25,7 +31,7 @@ def get_execution_analysis(strategy_data: str) -> dict:
         
         # Call MCP server for execution analysis
         response = requests.post(
-            'http://localhost:3001/execution-analyze',
+            'http://localhost:3003/execution-analyze',
             json={'strategy_data': strategy_data},
             timeout=10
         )
@@ -70,73 +76,122 @@ execution_analyst_agent = LlmAgent(
     tools=[get_execution_analysis],
 )
 
-# Flask app for A2A protocol
-app = Flask(__name__)
+class ExecutionAnalystA2AServer(A2AServer):
+    """Enhanced Execution Analyst A2A Server with full protocol support"""
+    
+    def __init__(self):
+        super().__init__(
+            agent_name="execution_analyst_agent",
+            description="Execution analyst agent that provides comprehensive trade execution analysis using MCP server",
+            capabilities=[
+                "execution_analysis", 
+                "order_optimization",
+                "timing_analysis",
+                "cost_analysis", 
+                "broker_selection",
+                "risk_management",
+                "order_types",
+                "market_impact_analysis",
+                "mcp_integration"
+            ],
+            model=MODEL,
+            version="2.0"
+        )
+    
+    def _process_message(self, message: str) -> str:
+        """Process execution analysis message and return structured result"""
+        try:
+            print(f"⚡ Processing execution analysis for: {message[:100]}...")
+            
+            # Get execution analysis from MCP server
+            execution_result = get_execution_analysis(strategy_data=message)
+            
+            if execution_result.get('status') == 'success':
+                # Create artifacts for different execution components
+                artifacts = []
+                
+                # Execution strategy artifact
+                strategy_data = TaskArtifact(
+                    artifact_id=str(uuid.uuid4()),
+                    name="execution_strategy",
+                    type="json",
+                    content={
+                        "execution_strategy": execution_result.get('execution_strategy'),
+                        "order_types": execution_result.get('order_types'),
+                        "timing_recommendations": execution_result.get('timing_recommendations')
+                    },
+                    metadata={"component": "execution_strategy", "generated_by": "mcp_server"}
+                )
+                artifacts.append(strategy_data)
+                
+                # Cost and risk analysis artifact
+                cost_risk_data = TaskArtifact(
+                    artifact_id=str(uuid.uuid4()),
+                    name="cost_risk_analysis",
+                    type="json",
+                    content={
+                        "cost_analysis": execution_result.get('cost_analysis'),
+                        "risk_considerations": execution_result.get('risk_considerations'),
+                        "broker_recommendations": execution_result.get('broker_recommendations')
+                    },
+                    metadata={"component": "cost_risk_analysis", "generated_by": "mcp_server"}
+                )
+                artifacts.append(cost_risk_data)
+                
+                # Format comprehensive response
+                response = f"""
+# ⚡ Trade Execution Analysis Report
 
-# Agent card
-AGENT_CARD = {
-    "name": "execution_analyst_agent",
-    "description": "Execution analyst agent that provides execution analysis using MCP server",
-    "version": "1.0",
-    "capabilities": ["execution_analysis", "mcp_integration", "order_optimization"],
-    "model": MODEL,
-    "endpoints": {
-        "chat": "/chat",
-        "card": "/agent-card"
-    },
-    "input_format": "text",
-    "output_format": "json",
-    "data_source": "MCP Server"
-}
+## Execution Strategy
+{chr(10).join([f"• {strategy}" for strategy in execution_result.get('execution_strategy', [])])}
 
-@app.route('/agent-card', methods=['GET'])
-def get_agent_card():
-    """Return the agent card describing capabilities"""
-    return jsonify(AGENT_CARD)
+## Recommended Order Types
+{chr(10).join([f"• {order}" for order in execution_result.get('order_types', [])])}
 
-@app.route('/chat', methods=['POST'])
-def chat():
-    """Main endpoint for A2A communication"""
-    try:
-        data = request.get_json()
-        message = data.get('message', '')
-        
-        print(f"A2A received message: {message}")  # Debug log
-        
-        if not message:
-            return jsonify({"error": "No message provided"}), 400
-        
-        # Directly call the tool function to bypass the complex runner
-        # and avoid the LLM's final response generation.
-        response_text = get_execution_analysis(strategy_data=message)
-        
-        print(f"A2A direct tool response: {response_text}")
-        
-        return jsonify({
-            "response": response_text,
-            "agent": "execution_analyst_agent",
-            "status": "success"
-        })
-        
-    except Exception as e:
-        print(f"Error in A2A chat endpoint: {str(e)}")  # Debug logging
-        return jsonify({
-            "error": str(e),
-            "status": "error"
-        }), 500
+## Timing Recommendations
+{chr(10).join([f"• {timing}" for timing in execution_result.get('timing_recommendations', [])])}
 
-@app.route('/health', methods=['GET'])
-def health_check():
-    """Health check endpoint"""
-    return jsonify({"status": "healthy", "agent": "execution_analyst_agent"})
+## Cost Analysis
+{json.dumps(execution_result.get('cost_analysis', {}), indent=2)}
+
+## Risk Considerations
+{chr(10).join([f"• {risk}" for risk in execution_result.get('risk_considerations', [])])}
+
+## Broker Recommendations
+{chr(10).join([f"• {broker}" for broker in execution_result.get('broker_recommendations', [])])}
+
+---
+*Analysis powered by MCP Execution Strategy Server*
+                """.strip()
+                
+                print(f"✅ Execution analysis completed successfully")
+                return response
+                
+            else:
+                error_msg = execution_result.get('message', 'Unknown error occurred')
+                print(f"❌ Execution analysis failed: {error_msg}")
+                return f"🚨 **Execution Analysis Error**: {error_msg}"
+                
+        except Exception as e:
+            error_msg = f"Error processing execution analysis: {str(e)}"
+            print(f"❌ {error_msg}")
+            return f"🚨 **Processing Error**: {error_msg}"
+
+# Create enhanced A2A server instance
+a2a_server = ExecutionAnalystA2AServer()
 
 def run_server(host='localhost', port=8081, debug=False):
-    """Start the A2A agent server"""
-    print(f"Starting A2A Execution Analyst Agent on http://{host}:{port}")
-    print(f"Agent card available at: http://{host}:{port}/agent-card")
-    print(f"Chat endpoint available at: http://{host}:{port}/chat")
-    print(f"MCP Server should be running on http://localhost:3001")
-    app.run(host=host, port=port, debug=debug)
+    """Start the enhanced A2A Execution Analyst server"""
+    print(f"🚀 Starting Enhanced A2A Execution Analyst Agent on http://{host}:{port}")
+    print(f"📋 Agent Card: http://{host}:{port}/.well-known/agent.json")
+    print(f"🔌 JSON-RPC Endpoint: http://{host}:{port}/rpc")
+    print(f"💬 Message Endpoint: http://{host}:{port}/message/send")
+    print(f"📡 Streaming Endpoint: http://{host}:{port}/message/stream")
+    print(f"🏥 Health Check: http://{host}:{port}/health")
+    print(f"🔧 MCP Server should be running on http://localhost:3003")
+    print(f"📊 Capabilities: {', '.join(a2a_server.capabilities)}")
+    
+    a2a_server.run_server(host=host, port=port, debug=debug)
 
 if __name__ == "__main__":
     run_server()

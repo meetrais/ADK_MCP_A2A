@@ -4,9 +4,19 @@ try:
 except ImportError:
     # Fallback for when running as standalone module
     import prompt
-from flask import Flask, request, jsonify
+
+try:
+    from ...a2a_protocol import A2AServer, TaskArtifact
+except ImportError:
+    # Fallback for standalone execution
+    import sys
+    import os
+    sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+    from a2a_protocol import A2AServer, TaskArtifact
+
 import json
 import requests
+import uuid
 
 MODEL = "gemini-2.5-flash"
 
@@ -74,77 +84,131 @@ risk_analyst_agent = LlmAgent(
     tools=[get_risk_analysis],
 )
 
-# Flask app for A2A protocol
-app = Flask(__name__)
-
-# Agent card
-AGENT_CARD = {
-    "name": "risk_analyst_agent",
-    "description": "Risk analyst agent that provides risk assessment using MCP server",
-    "version": "1.0",
-    "capabilities": ["risk_analysis", "mcp_integration", "portfolio_assessment"],
-    "model": MODEL,
-    "endpoints": {
-        "chat": "/chat",
-        "card": "/agent-card"
-    },
-    "input_format": "text",
-    "output_format": "json",
-    "data_source": "MCP Server"
-}
-
-@app.route('/agent-card', methods=['GET'])
-def get_agent_card():
-    """Return the agent card describing capabilities"""
-    return jsonify(AGENT_CARD)
-
-@app.route('/chat', methods=['POST'])
-def chat():
-    """Main endpoint for A2A communication"""
-    try:
-        data = request.get_json()
-        
-        if not data:
-            return jsonify({"error": "No JSON data provided"}), 400
+class RiskAnalystA2AServer(A2AServer):
+    """Enhanced Risk Analyst A2A Server with full protocol support"""
+    
+    def __init__(self):
+        super().__init__(
+            agent_name="risk_analyst_agent",
+            description="Risk analyst agent that provides comprehensive risk assessment using MCP server",
+            capabilities=[
+                "risk_analysis", 
+                "portfolio_assessment", 
+                "volatility_analysis",
+                "value_at_risk_calculation",
+                "stress_testing",
+                "correlation_analysis",
+                "hedging_recommendations",
+                "mcp_integration"
+            ],
+            model=MODEL,
+            version="2.0"
+        )
+    
+    def _process_message(self, message: str) -> str:
+        """Process risk analysis message and return structured result"""
+        try:
+            print(f"🔍 Processing risk analysis for: {message[:100]}...")
             
-        message = data.get('message', '')
-        
-        print(f"A2A received message: {message}")  # Debug log
-        
-        if not message:
-            return jsonify({"error": "No message provided"}), 400
-        
-        # Directly call the tool function to bypass the complex runner
-        # and avoid the LLM's final response generation.
-        response_text = get_risk_analysis(portfolio_data=message)
-        
-        print(f"A2A direct tool response: {response_text}")
-        
-        return jsonify({
-            "response": response_text,
-            "agent": "risk_analyst_agent",
-            "status": "success"
-        })
-        
-    except Exception as e:
-        print(f"Error in A2A chat endpoint: {str(e)}")  # Debug logging
-        return jsonify({
-            "error": str(e),
-            "status": "error"
-        }), 500
+            # Get risk analysis from MCP server
+            risk_result = get_risk_analysis(portfolio_data=message)
+            
+            if risk_result.get('status') == 'success':
+                # Create artifacts for different risk components
+                artifacts = []
+                
+                # Risk metrics artifact
+                risk_metrics = TaskArtifact(
+                    artifact_id=str(uuid.uuid4()),
+                    name="risk_metrics",
+                    type="json",
+                    content={
+                        "overall_risk_score": risk_result.get('overall_risk_score'),
+                        "risk_level": risk_result.get('risk_level'),
+                        "portfolio_volatility": risk_result.get('portfolio_volatility'),
+                        "value_at_risk": risk_result.get('value_at_risk'),
+                        "diversification_score": risk_result.get('diversification_score')
+                    },
+                    metadata={"component": "risk_metrics", "generated_by": "mcp_server"}
+                )
+                artifacts.append(risk_metrics)
+                
+                # Risk recommendations artifact
+                recommendations = TaskArtifact(
+                    artifact_id=str(uuid.uuid4()),
+                    name="risk_recommendations",
+                    type="json",
+                    content={
+                        "risk_recommendations": risk_result.get('risk_recommendations'),
+                        "hedging_suggestions": risk_result.get('hedging_suggestions')
+                    },
+                    metadata={"component": "recommendations", "generated_by": "mcp_server"}
+                )
+                artifacts.append(recommendations)
+                
+                # Store artifacts in current task (if available)
+                # This would be enhanced in a full implementation
+                
+                # Format comprehensive response
+                response = f"""
+# 📊 Risk Analysis Report
 
-@app.route('/health', methods=['GET'])
-def health_check():
-    """Health check endpoint"""
-    return jsonify({"status": "healthy", "agent": "risk_analyst_agent"})
+## Overall Risk Assessment
+- **Risk Score**: {risk_result.get('overall_risk_score', 'N/A')}/10
+- **Risk Level**: {risk_result.get('risk_level', 'N/A')}
+- **Portfolio Volatility**: {risk_result.get('portfolio_volatility', 'N/A')}%
+
+## Key Risk Metrics
+- **Value at Risk (VaR)**: {risk_result.get('value_at_risk', 'N/A')}
+- **Diversification Score**: {risk_result.get('diversification_score', 'N/A')}/10
+
+## Risk Factors
+{chr(10).join([f"• {factor}" for factor in risk_result.get('risk_factors', [])])}
+
+## Recommendations
+{chr(10).join([f"• {rec}" for rec in risk_result.get('risk_recommendations', [])])}
+
+## Hedging Suggestions
+{chr(10).join([f"• {hedge}" for hedge in risk_result.get('hedging_suggestions', [])])}
+
+## Stress Test Results
+{json.dumps(risk_result.get('stress_test_results', {}), indent=2)}
+
+## Correlation Analysis
+{json.dumps(risk_result.get('correlation_analysis', {}), indent=2)}
+
+---
+*Analysis powered by MCP Risk Analytics Server*
+                """.strip()
+                
+                print(f"✅ Risk analysis completed successfully")
+                return response
+                
+            else:
+                error_msg = risk_result.get('message', 'Unknown error occurred')
+                print(f"❌ Risk analysis failed: {error_msg}")
+                return f"🚨 **Risk Analysis Error**: {error_msg}"
+                
+        except Exception as e:
+            error_msg = f"Error processing risk analysis: {str(e)}"
+            print(f"❌ {error_msg}")
+            return f"🚨 **Processing Error**: {error_msg}"
+
+# Create enhanced A2A server instance
+a2a_server = RiskAnalystA2AServer()
 
 def run_server(host='localhost', port=8083, debug=False):
-    """Start the A2A agent server"""
-    print(f"Starting A2A Risk Analyst Agent on http://{host}:{port}")
-    print(f"Agent card available at: http://{host}:{port}/agent-card")
-    print(f"Chat endpoint available at: http://{host}:{port}/chat")
-    print(f"MCP Server should be running on http://localhost:3001")
-    app.run(host=host, port=port, debug=debug)
+    """Start the enhanced A2A Risk Analyst server"""
+    print(f"🚀 Starting Enhanced A2A Risk Analyst Agent on http://{host}:{port}")
+    print(f"📋 Agent Card: http://{host}:{port}/.well-known/agent.json")
+    print(f"🔌 JSON-RPC Endpoint: http://{host}:{port}/rpc")
+    print(f"💬 Message Endpoint: http://{host}:{port}/message/send")
+    print(f"📡 Streaming Endpoint: http://{host}:{port}/message/stream")
+    print(f"🏥 Health Check: http://{host}:{port}/health")
+    print(f"🔧 MCP Server should be running on http://localhost:3001")
+    print(f"📊 Capabilities: {', '.join(a2a_server.capabilities)}")
+    
+    a2a_server.run_server(host=host, port=port, debug=debug)
 
 if __name__ == "__main__":
     run_server()
