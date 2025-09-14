@@ -1,6 +1,7 @@
 """
 Enhanced Agent-to-Agent (A2A) Protocol Implementation
 Proper JSON-RPC 2.0 Implementation following the official specification
+Incorporating expert improvements for full compliance
 """
 
 import json
@@ -166,6 +167,7 @@ class A2ATask:
     response: Optional[A2AMessage] = None
     artifacts: List[TaskArtifact] = None
     progress: float = 0.0
+    priority: str = "normal"
     error: Optional[str] = None
     created_at: str = None
     updated_at: str = None
@@ -189,8 +191,9 @@ class A2ATask:
         self.artifacts.append(artifact)
         self.updated_at = datetime.utcnow().isoformat()
 
-class JSONRPCServer:
-    """JSON-RPC 2.0 Server following official specification"""
+class ImprovedJSONRPCServer:
+    """Improved JSON-RPC 2.0 Server with full specification compliance"""
+    
     def __init__(self):
         self.methods: Dict[str, callable] = {}
     
@@ -198,33 +201,91 @@ class JSONRPCServer:
         """Register a method that can be called via JSON-RPC"""
         self.methods[name] = method
     
-    def handle_request(self, request_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Handle incoming JSON-RPC request with proper validation"""
+    def handle_request(self, request_data: Union[Dict, List]) -> Optional[Union[Dict, List]]:
+        """
+        Handle JSON-RPC 2.0 request with full specification compliance
+        Supports both single requests and batch requests
+        """
+        
+        # Handle batch requests (array of requests)
+        if isinstance(request_data, list):
+            if len(request_data) == 0:
+                return self._error_response(None, JSONRPCErrorCode.INVALID_REQUEST, "Invalid Request", "Empty batch request")
+            
+            responses = []
+            for single_request in request_data:
+                response = self._handle_single_request(single_request)
+                if response is not None:  # Don't include notification responses
+                    responses.append(response)
+            
+            # Return responses or nothing if all were notifications
+            return responses if responses else None
+        
+        # Handle single request
+        return self._handle_single_request(request_data)
+    
+    def _handle_single_request(self, request_data: Any) -> Optional[Dict[str, Any]]:
+        """Handle a single JSON-RPC request"""
         
         # Validate basic structure
         if not isinstance(request_data, dict):
-            return self._error_response(None, JSONRPCErrorCode.INVALID_REQUEST, "Request must be an object")
+            return self._error_response(None, JSONRPCErrorCode.INVALID_REQUEST, "Invalid Request", "Request must be an object")
         
+        # Check JSON-RPC version
         if request_data.get("jsonrpc") != "2.0":
-            return self._error_response(request_data.get("id"), JSONRPCErrorCode.INVALID_REQUEST, "Invalid JSON-RPC version")
+            return self._error_response(
+                request_data.get("id"), 
+                JSONRPCErrorCode.INVALID_REQUEST, 
+                "Invalid Request", 
+                "jsonrpc field must be '2.0'"
+            )
         
+        # Check method field
         method_name = request_data.get("method")
-        if not method_name or not isinstance(method_name, str):
-            return self._error_response(request_data.get("id"), JSONRPCErrorCode.INVALID_REQUEST, "Invalid method")
+        if not isinstance(method_name, str):
+            return self._error_response(
+                request_data.get("id"), 
+                JSONRPCErrorCode.INVALID_REQUEST, 
+                "Invalid Request", 
+                "method field must be a string"
+            )
+        
+        # Check if method name starts with "rpc." (reserved)
+        if method_name.startswith("rpc.") and method_name not in ["rpc.discover"]:
+            return self._error_response(
+                request_data.get("id"),
+                JSONRPCErrorCode.METHOD_NOT_FOUND,
+                "Method not found",
+                f"Method names starting with 'rpc.' are reserved"
+            )
         
         params = request_data.get("params")
         request_id = request_data.get("id")
         
+        # Validate params if present
+        if params is not None and not isinstance(params, (dict, list)):
+            return self._error_response(
+                request_id,
+                JSONRPCErrorCode.INVALID_PARAMS,
+                "Invalid params",
+                "params must be an object or array"
+            )
+        
         # Check if it's a notification
-        is_notification = request_id is None
+        is_notification = "id" not in request_data  # Note: id can be null, but must be present
         
         # Check if method exists
         if method_name not in self.methods:
             if not is_notification:
-                return self._error_response(request_id, JSONRPCErrorCode.METHOD_NOT_FOUND, f"Method '{method_name}' not found")
+                return self._error_response(
+                    request_id, 
+                    JSONRPCErrorCode.METHOD_NOT_FOUND, 
+                    "Method not found", 
+                    f"Method '{method_name}' not found"
+                )
             return None
         
-        # Call method
+        # Call method with proper error handling
         try:
             method = self.methods[method_name]
             
@@ -232,13 +293,11 @@ class JSONRPCServer:
             if params is None:
                 result = method()
             elif isinstance(params, list):
+                # Positional parameters
                 result = method(*params)
             elif isinstance(params, dict):
+                # Named parameters
                 result = method(**params)
-            else:
-                if not is_notification:
-                    return self._error_response(request_id, JSONRPCErrorCode.INVALID_PARAMS, "Invalid params type")
-                return None
             
             # Return result (or nothing for notifications)
             if not is_notification:
@@ -251,15 +310,27 @@ class JSONRPCServer:
             return None
             
         except TypeError as e:
+            # Parameter mismatch
             if not is_notification:
-                return self._error_response(request_id, JSONRPCErrorCode.INVALID_PARAMS, f"Invalid parameters: {str(e)}")
+                return self._error_response(
+                    request_id, 
+                    JSONRPCErrorCode.INVALID_PARAMS, 
+                    "Invalid params", 
+                    f"Parameter mismatch: {str(e)}"
+                )
             return None
         except Exception as e:
+            # Internal error
             if not is_notification:
-                return self._error_response(request_id, JSONRPCErrorCode.INTERNAL_ERROR, f"Method execution error: {str(e)}")
+                return self._error_response(
+                    request_id, 
+                    JSONRPCErrorCode.INTERNAL_ERROR, 
+                    "Internal error", 
+                    f"Method execution failed: {str(e)}"
+                )
             return None
     
-    def _error_response(self, request_id: Optional[Union[str, int]], code: int, message: str, data: Any = None) -> Dict[str, Any]:
+    def _error_response(self, request_id: Any, code: int, message: str, data: Any = None) -> Dict[str, Any]:
         """Create properly formatted error response"""
         error = {"code": code, "message": message}
         if data is not None:
@@ -297,7 +368,7 @@ class JSONRPCClient:
                 timeout=self.timeout
             )
             
-            # Handle HTTP-level errors
+            # JSON-RPC 2.0 spec: Always return HTTP 200 for application-level errors
             if http_response.status_code != 200:
                 return self._create_error_response(
                     request.id,
@@ -383,7 +454,7 @@ class JSONRPCClient:
                 headers={"Content-Type": "application/json"},
                 timeout=self.timeout
             )
-            return http_response.status_code == 200
+            return http_response.status_code in [200, 204]
         except:
             return False
     
@@ -396,7 +467,7 @@ class JSONRPCClient:
         )
 
 class A2AServer:
-    """Enhanced A2A Server with proper JSON-RPC 2.0 support"""
+    """Enhanced A2A Server with improved JSON-RPC 2.0 compliance"""
     
     def __init__(self, agent_name: str, description: str, capabilities: List[str], 
                  model: str = "gemini-2.5-flash", version: str = "1.0"):
@@ -407,7 +478,7 @@ class A2AServer:
         self.version = version
         self.tasks: Dict[str, A2ATask] = {}
         self.app = Flask(__name__)
-        self.rpc_server = JSONRPCServer()
+        self.rpc_server = ImprovedJSONRPCServer()
         self.setup_routes()
         self.setup_rpc_methods()
         
@@ -415,10 +486,16 @@ class A2AServer:
         self.stream_queues: Dict[str, queue.Queue] = {}
         
     def setup_rpc_methods(self):
-        """Setup JSON-RPC 2.0 methods"""
+        """Setup JSON-RPC 2.0 methods with proper signatures and validation"""
+        
+        # Register built-in method for service discovery
+        self.rpc_server.register_method("rpc.discover", self._rpc_discover)
+        
+        # Register A2A-specific methods
         self.rpc_server.register_method("message.send", self._rpc_message_send)
         self.rpc_server.register_method("tasks.get", self._rpc_tasks_get)
         self.rpc_server.register_method("tasks.create", self._rpc_tasks_create)
+        self.rpc_server.register_method("tasks.cancel", self._rpc_tasks_cancel)
         self.rpc_server.register_method("artifacts.get", self._rpc_artifacts_get)
         
     def setup_routes(self):
@@ -458,59 +535,53 @@ class A2AServer:
         
         @self.app.route('/rpc', methods=['POST'])
         def handle_rpc():
-            """Main JSON-RPC 2.0 endpoint with proper validation"""
+            """
+            Main JSON-RPC 2.0 endpoint with full specification compliance
+            Always returns HTTP 200 as per JSON-RPC 2.0 spec
+            """
             try:
-                data = request.get_json()
-                if not data:
+                # Parse JSON
+                try:
+                    data = request.get_json(force=True)  # Force parsing even with wrong content-type
+                except Exception:
+                    # Parse error - return HTTP 200 with JSON-RPC error
                     return jsonify({
                         "jsonrpc": "2.0",
                         "error": {
                             "code": JSONRPCErrorCode.PARSE_ERROR,
-                            "message": "Invalid JSON"
+                            "message": "Parse error",
+                            "data": "Invalid JSON was received by the server"
                         },
                         "id": None
-                    }), 400
+                    }), 200  # Note: HTTP 200, not 400
                 
+                # Handle request
                 response = self.rpc_server.handle_request(data)
-                if response:
-                    # Determine HTTP status code based on error
-                    if "error" in response:
-                        error_code = response["error"]["code"]
-                        if error_code == JSONRPCErrorCode.METHOD_NOT_FOUND:
-                            return jsonify(response), 404
-                        elif error_code in [JSONRPCErrorCode.INVALID_REQUEST, JSONRPCErrorCode.INVALID_PARAMS]:
-                            return jsonify(response), 400
-                        else:
-                            return jsonify(response), 500
-                    return jsonify(response)
+                
+                if response is not None:
+                    return jsonify(response), 200
                 else:
-                    # Notification - no response
-                    return "", 200
+                    # Notification - return HTTP 204 No Content
+                    return "", 204
                     
-            except json.JSONDecodeError:
-                return jsonify({
-                    "jsonrpc": "2.0",
-                    "error": {
-                        "code": JSONRPCErrorCode.PARSE_ERROR,
-                        "message": "Invalid JSON"
-                    },
-                    "id": None
-                }), 400
             except Exception as e:
+                # Unexpected server error
                 return jsonify({
                     "jsonrpc": "2.0",
                     "error": {
                         "code": JSONRPCErrorCode.INTERNAL_ERROR,
-                        "message": f"Internal server error: {str(e)}"
+                        "message": "Internal error",
+                        "data": f"Unexpected server error: {str(e)}"
                     },
-                    "id": data.get("id") if data else None
-                }), 500
+                    "id": None
+                }), 200  # Still HTTP 200
         
         @self.app.route('/message/send', methods=['POST'])
         def message_send():
             """Direct message sending endpoint"""
             data = request.get_json()
-            return self._handle_message_send(data.get("message", ""))
+            result = self._handle_message_send(data.get("message", ""))
+            return jsonify(result)
         
         @self.app.route('/message/stream', methods=['POST'])
         def message_stream():
@@ -536,11 +607,11 @@ class A2AServer:
                     self.tasks[task_id] = task
                     
                     # Start processing and yield updates
-                    yield f"data: {json.dumps({'type': 'task_created', 'task_id': task_id})}\n\n"
+                    yield f"data: {json.dumps({'type': 'task_created', 'task_id': task_id})}\\n\\n"
                     
                     # Update to working state
                     task.update_state(TaskState.WORKING)
-                    yield f"data: {json.dumps({'type': 'state_change', 'task_id': task_id, 'state': 'working'})}\n\n"
+                    yield f"data: {json.dumps({'type': 'state_change', 'task_id': task_id, 'state': 'working'})}\\n\\n"
                     
                     # Process message (this would call your actual agent logic)
                     result = self._process_message(data.get("message", ""))
@@ -556,12 +627,13 @@ class A2AServer:
                     task.update_state(TaskState.COMPLETED)
                     task.progress = 1.0
                     
-                    yield f"data: {json.dumps({'type': 'progress', 'task_id': task_id, 'progress': 1.0})}\n\n"
-                    yield f"data: {json.dumps({'type': 'completed', 'task_id': task_id, 'result': result})}\n\n"
+                    yield f"data: {json.dumps({'type': 'progress', 'task_id': task_id, 'progress': 1.0})}\\n\\n"
+                    yield f"data: {json.dumps({'type': 'completed', 'task_id': task_id, 'result': result})}\\n\\n"
                     
                 except Exception as e:
-                    task.update_state(TaskState.FAILED, str(e))
-                    yield f"data: {json.dumps({'type': 'error', 'task_id': task_id, 'error': str(e)})}\n\n"
+                    if task_id in self.tasks:
+                        self.tasks[task_id].update_state(TaskState.FAILED, str(e))
+                    yield f"data: {json.dumps({'type': 'error', 'task_id': task_id, 'error': str(e)})}\\n\\n"
             
             return Response(stream_with_context(generate()), mimetype='text/event-stream')
         
@@ -574,6 +646,7 @@ class A2AServer:
                         "task_id": task_id,
                         "state": task.state.value,
                         "progress": task.progress,
+                        "priority": task.priority,
                         "created_at": task.created_at,
                         "updated_at": task.updated_at
                     }
@@ -592,6 +665,7 @@ class A2AServer:
                 "task_id": task_id,
                 "state": task.state.value,
                 "progress": task.progress,
+                "priority": task.priority,
                 "created_at": task.created_at,
                 "updated_at": task.updated_at,
                 "message": task.message.to_dict(),
@@ -630,23 +704,53 @@ class A2AServer:
         def legacy_chat():
             """Legacy chat endpoint"""
             data = request.get_json()
-            return self._handle_message_send(data.get("message", ""))
+            result = self._handle_message_send(data.get("message", ""))
+            return jsonify(result)
     
-    def _rpc_message_send(self, message: str = "") -> Dict[str, Any]:
-        """JSON-RPC method: message.send"""
-        return self._handle_message_send(message)
+    def _rpc_discover(self) -> Dict[str, Any]:
+        """JSON-RPC method: rpc.discover - Service discovery"""
+        return {
+            "name": self.agent_name,
+            "description": self.description,
+            "methods": list(self.rpc_server.methods.keys()),
+            "version": self.version,
+            "protocol": "JSON-RPC 2.0",
+            "capabilities": ["batch_requests", "notifications", "a2a_protocol"] + self.capabilities
+        }
     
-    def _rpc_tasks_get(self, task_id: str = None) -> Dict[str, Any]:
-        """JSON-RPC method: tasks.get"""
-        if task_id:
+    def _rpc_message_send(self, message: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
+        """JSON-RPC method: message.send with proper parameter validation"""
+        if not isinstance(message, str):
+            raise TypeError("message parameter must be a string")
+        
+        if context is not None and not isinstance(context, dict):
+            raise TypeError("context parameter must be an object")
+        
+        # Process message
+        result = self._handle_message_send(message)
+        
+        return {
+            "response": result.get("response", ""),
+            "agent": self.agent_name,
+            "timestamp": datetime.utcnow().isoformat(),
+            "task_id": result.get("task_id")
+        }
+    
+    def _rpc_tasks_get(self, task_id: str = None) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
+        """JSON-RPC method: tasks.get with optional task_id parameter"""
+        if task_id is not None:
+            if not isinstance(task_id, str):
+                raise TypeError("task_id parameter must be a string")
+            
             if task_id not in self.tasks:
-                raise ValueError("Task not found")
+                raise ValueError(f"Task '{task_id}' not found")
             
             task = self.tasks[task_id]
             return {
                 "task_id": task_id,
                 "state": task.state.value,
                 "progress": task.progress,
+                "priority": task.priority,
                 "created_at": task.created_at,
                 "updated_at": task.updated_at,
                 "message": task.message.to_dict(),
@@ -654,21 +758,26 @@ class A2AServer:
                 "artifacts": [asdict(artifact) for artifact in task.artifacts]
             }
         else:
-            return {
-                "tasks": [
-                    {
-                        "task_id": tid,
-                        "state": task.state.value,
-                        "progress": task.progress,
-                        "created_at": task.created_at,
-                        "updated_at": task.updated_at
-                    }
-                    for tid, task in self.tasks.items()
-                ]
-            }
+            return [
+                {
+                    "task_id": tid,
+                    "state": task.state.value,
+                    "progress": task.progress,
+                    "priority": task.priority,
+                    "created_at": task.created_at,
+                    "updated_at": task.updated_at
+                }
+                for tid, task in self.tasks.items()
+            ]
     
-    def _rpc_tasks_create(self, message: str = "") -> Dict[str, Any]:
-        """JSON-RPC method: tasks.create"""
+    def _rpc_tasks_create(self, message: str, priority: str = "normal") -> Dict[str, Any]:
+        """JSON-RPC method: tasks.create with parameter validation"""
+        if not isinstance(message, str):
+            raise TypeError("message parameter must be a string")
+        
+        if priority not in ["low", "normal", "high"]:
+            raise ValueError("priority must be one of: low, normal, high")
+        
         message_obj = A2AMessage(
             parts=[MessagePart(PartType.TEXT, message)],
             timestamp=datetime.utcnow().isoformat(),
@@ -679,21 +788,45 @@ class A2AServer:
         task = A2ATask(
             task_id=task_id,
             state=TaskState.SUBMITTED,
-            message=message_obj
+            message=message_obj,
+            priority=priority
         )
         
         self.tasks[task_id] = task
         
-        return {"task_id": task_id, "state": "submitted"}
+        return {
+            "task_id": task_id,
+            "state": "submitted",
+            "priority": priority
+        }
+    
+    def _rpc_tasks_cancel(self, task_id: str) -> Dict[str, Any]:
+        """JSON-RPC method: tasks.cancel"""
+        if not isinstance(task_id, str):
+            raise TypeError("task_id parameter must be a string")
+        
+        if task_id not in self.tasks:
+            raise ValueError(f"Task '{task_id}' not found")
+        
+        task = self.tasks[task_id]
+        if task.state in [TaskState.COMPLETED, TaskState.FAILED, TaskState.CANCELLED]:
+            raise ValueError(f"Cannot cancel task in {task.state.value} state")
+        
+        task.update_state(TaskState.CANCELLED)
+        
+        return {"task_id": task_id, "state": "cancelled"}
     
     def _rpc_artifacts_get(self, artifact_id: str) -> Dict[str, Any]:
         """JSON-RPC method: artifacts.get"""
+        if not isinstance(artifact_id, str):
+            raise TypeError("artifact_id parameter must be a string")
+        
         for task in self.tasks.values():
             for artifact in task.artifacts:
                 if artifact.artifact_id == artifact_id:
                     return asdict(artifact)
         
-        raise ValueError("Artifact not found")
+        raise ValueError(f"Artifact '{artifact_id}' not found")
     
     def _handle_message_send(self, message_content: str) -> Dict[str, Any]:
         """Handle message sending with proper A2A protocol"""
@@ -782,21 +915,32 @@ class A2AClient:
         
         return {"name": "unknown", "status": "unavailable"}
     
+    def discover_service(self) -> JSONRPCResponse:
+        """Discover service capabilities via JSON-RPC"""
+        return self.json_rpc_client.send_request("rpc.discover")
+    
     def send_rpc_request(self, method: str, params: Any = None) -> JSONRPCResponse:
         """Send JSON-RPC 2.0 request with proper validation"""
         return self.json_rpc_client.send_request(method, params)
     
-    def send_message(self, message: str) -> JSONRPCResponse:
+    def send_message(self, message: str, context: Dict[str, Any] = None) -> JSONRPCResponse:
         """Send message using message.send method"""
-        return self.send_rpc_request("message.send", {"message": message})
+        params = {"message": message}
+        if context:
+            params["context"] = context
+        return self.send_rpc_request("message.send", params)
     
-    def create_task(self, message: str) -> JSONRPCResponse:
+    def create_task(self, message: str, priority: str = "normal") -> JSONRPCResponse:
         """Create task using tasks.create method"""
-        return self.send_rpc_request("tasks.create", {"message": message})
+        return self.send_rpc_request("tasks.create", {"message": message, "priority": priority})
     
     def get_task_status(self, task_id: str) -> JSONRPCResponse:
         """Get task status"""
         return self.send_rpc_request("tasks.get", {"task_id": task_id})
+    
+    def cancel_task(self, task_id: str) -> JSONRPCResponse:
+        """Cancel task"""
+        return self.send_rpc_request("tasks.cancel", {"task_id": task_id})
     
     def get_all_tasks(self) -> JSONRPCResponse:
         """Get all tasks"""

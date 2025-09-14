@@ -31,7 +31,7 @@ def get_execution_analysis(strategy_data: str) -> dict:
         
         # Call MCP server for execution analysis
         response = requests.post(
-            'http://localhost:3003/execution-analyze',
+            'http://localhost:3001/execution-analyze',
             json={'strategy_data': strategy_data},
             timeout=10
         )
@@ -188,7 +188,7 @@ def run_server(host='localhost', port=8081, debug=False):
     print(f"💬 Message Endpoint: http://{host}:{port}/message/send")
     print(f"📡 Streaming Endpoint: http://{host}:{port}/message/stream")
     print(f"🏥 Health Check: http://{host}:{port}/health")
-    print(f"🔧 MCP Server should be running on http://localhost:3003")
+    print(f"🔧 MCP Server should be running on http://localhost:3001")
     print(f"📊 Capabilities: {', '.join(a2a_server.capabilities)}")
     
     a2a_server.run_server(host=host, port=port, debug=debug)

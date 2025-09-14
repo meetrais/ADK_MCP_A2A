@@ -31,7 +31,7 @@ def get_trading_analysis(market_data: str) -> dict:
         
         # Call MCP server for trading analysis
         response = requests.post(
-            'http://localhost:3002/trading-analyze',
+            'http://localhost:3001/trading-analyze',
             json={'market_data': market_data},
             timeout=10
         )
@@ -187,7 +187,7 @@ def run_server(host='localhost', port=8082, debug=False):
     print(f"💬 Message Endpoint: http://{host}:{port}/message/send")
     print(f"📡 Streaming Endpoint: http://{host}:{port}/message/stream")
     print(f"🏥 Health Check: http://{host}:{port}/health")
-    print(f"🔧 MCP Server should be running on http://localhost:3002")
+    print(f"🔧 MCP Server should be running on http://localhost:3001")
     print(f"📊 Capabilities: {', '.join(a2a_server.capabilities)}")
     
     a2a_server.run_server(host=host, port=port, debug=debug)

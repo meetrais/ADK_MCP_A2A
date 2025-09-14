@@ -116,10 +116,10 @@ class EnhancedA2AAgentProxy(BaseAgent):
     def get_agent_info(self) -> dict:
         """Get enhanced agent card information via discovery mechanism"""
         try:
-            # Try enhanced discovery first (well-known URI)
+            # Try Agent discovery first (well-known URI)
             agent_info = self._a2a_client.discover_agent()
             if agent_info.get("name") != "unknown":
-                print(f"🔍 Enhanced discovery successful for '{self.name}'")
+                print(f"🔍 Agent discovery successful for '{self.name}'")
                 return agent_info
             
             # Fallback to legacy endpoint
@@ -180,7 +180,7 @@ class EnhancedA2AAgentManager:
         self._initialize_agents()
     
     def _initialize_agents(self):
-        """Initialize agents with enhanced discovery and health checks"""
+        """Initialize agents with Agent discovery and health checks"""
         print("🚀 Initializing Enhanced A2A agents with full protocol discovery...")
         
         for agent_name, config in A2A_AGENTS.items():
@@ -191,7 +191,7 @@ class EnhancedA2AAgentManager:
                     description=config["description"]
                 )
                 
-                # Enhanced discovery with protocol detection
+                # Agent discovery with protocol detection
                 agent_info = agent.get_agent_info()
                 
                 if agent_info.get("status") != "unavailable":
